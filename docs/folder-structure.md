@@ -1,0 +1,46 @@
+# Marketplace Folder Structure
+
+```text
+app/
+  api/
+    auth/[...nextauth]/route.ts
+    payments/webhook/route.ts
+    webhooks/route.ts
+    webhooks/payment/route.ts
+  actions/
+    downloads.ts
+    payments.ts
+  checkout/[templateId]/page.tsx
+  dashboard/page.tsx
+  downloads/page.tsx
+  library/page.tsx
+  preview/[id]/page.tsx
+  products/page.tsx
+  success/page.tsx
+components/
+  bento/
+  currency/
+    currency-provider.tsx
+    currency-switcher.tsx
+  live-preview-button.tsx
+  preview/
+    preview-frame.tsx
+  product/
+    apple-product-card.tsx
+  purchase-card.tsx
+lib/
+  config/
+    currency.ts
+  db/
+    index.ts
+    schema.ts
+  payments/
+    aba-payway.ts
+    bakong-khqr.ts
+    verify-payment.ts
+  storage/
+    secure-download.ts
+auth.config.ts
+auth.ts
+middleware.ts
+```
