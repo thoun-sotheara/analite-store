@@ -73,93 +73,105 @@ export async function GET() {
 
 // ─── POST /api/admin/templates ────────────────────────────────────────────────
 export async function POST(request: Request) {
-  if (!(await requireAdmin())) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-  if (!db) {
-    return NextResponse.json({ error: "Database unavailable" }, { status: 503 });
-  }
-
-  let body: unknown;
   try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
-  }
+    if (!(await requireAdmin())) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    if (!db) {
+      return NextResponse.json({ error: "Database unavailable" }, { status: 503 });
+    }
 
-  const parsed = createTemplateSchema.safeParse(body);
-  if (!parsed.success) {
-    return NextResponse.json(
-      { error: "Validation failed", issues: parsed.error.flatten().fieldErrors },
-      { status: 422 },
-    );
-  }
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+    }
 
-  const data = parsed.data;
+    const parsed = createTemplateSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Validation failed", issues: parsed.error.flatten().fieldErrors },
+        { status: 422 },
+      );
+    }
 
-  // Check slug uniqueness
-  const existingSlug = await db
-    .select({ id: templates.id })
-    .from(templates)
-    .where(eq(templates.slug, data.slug))
-    .limit(1);
-  if (existingSlug.length > 0) {
-    return NextResponse.json({ error: "Slug already in use" }, { status: 409 });
-  }
+    const data = parsed.data;
 
-  let newTemplate: { id: string } | undefined;
+    // Check slug uniqueness
+    const existingSlug = await db
+      .select({ id: templates.id })
+      .from(templates)
+      .where(eq(templates.slug, data.slug))
+      .limit(1);
+    if (existingSlug.length > 0) {
+      return NextResponse.json({ error: "Slug already in use" }, { status: 409 });
+    }
 
-  try {
-    [newTemplate] = await db
-      .insert(templates)
-      .values({
-        title: data.title,
-        description: data.description ?? null,
-        priceUsd: data.priceUsd,
-        s3Key: data.s3Key,
-        previewUrl: data.previewUrl || null,
-        screenMockupUrl: data.screenMockupUrl || null,
-        galleryImage1: data.galleryImage1 || null,
-        galleryImage2: data.galleryImage2 || null,
-        galleryImage3: data.galleryImage3 || null,
-        galleryImage4: data.galleryImage4 || null,
-        documentationUrl: data.documentationUrl || null,
-        slug: data.slug,
-        techStack: data.techStack ?? null,
-        category: data.category,
-        categoryId: data.categoryId ?? null,
-        vendorId: data.vendorId ?? null,
-        isActive: data.isActive,
-      })
-      .returning({ id: templates.id });
-  } catch {
-    // Fallback for older production schemas that do not yet have newer optional columns.
-    const legacyCategory = ["real-estate", "portfolio", "e-commerce", "wedding"].includes(data.category)
-      ? data.category
-      : "e-commerce";
+    let newTemplate: { id: string } | undefined;
 
-    [newTemplate] = await db
-      .insert(templates)
-      .values({
-        title: data.title,
-        description: data.description ?? null,
-        priceUsd: data.priceUsd,
-        s3Key: data.s3Key,
-        previewUrl: data.previewUrl || null,
-        screenMockupUrl: data.screenMockupUrl || null,
-        documentationUrl: data.documentationUrl || null,
-        slug: data.slug,
-        techStack: data.techStack ?? null,
-        category: legacyCategory,
-        isActive: data.isActive,
-      })
-      .returning({ id: templates.id });
-  }
+    try {
+      [newTemplate] = await db
+        .insert(templates)
+        .values({
+          title: data.title,
+          description: data.description ?? null,
+          priceUsd: data.priceUsd,
+          s3Key: data.s3Key,
+          previewUrl: data.previewUrl || null,
+          screenMockupUrl: data.screenMockupUrl || null,
+          galleryImage1: data.galleryImage1 || null,
+          galleryImage2: data.galleryImage2 || null,
+          galleryImage3: data.galleryImage3 || null,
+          galleryImage4: data.galleryImage4 || null,
+          documentationUrl: data.documentationUrl || null,
+          slug: data.slug,
+          techStack: data.techStack ?? null,
+          category: data.category,
+          categoryId: data.categoryId ?? null,
+          vendorId: data.vendorId ?? null,
+          isActive: data.isActive,
+        })
+        .returning({ id: templates.id });
+    } catch {
+      // Fallback for older production schemas that do not yet have newer optional columns.
+      const legacyCategory = ["real-estate", "portfolio", "e-commerce", "wedding"].includes(data.category)
+        ? data.category
+        : "e-commerce";
 
-    // Purge Next.js cached pages so the new product is visible immediately
-    revalidatePath("/api/catalog");
-    revalidatePath("/products");
-    revalidatePath("/");
+      [newTemplate] = await db
+        .insert(templates)
+        .values({
+          title: data.title,
+          description: data.description ?? null,
+          priceUsd: data.priceUsd,
+          s3Key: data.s3Key,
+          previewUrl: data.previewUrl || null,
+          screenMockupUrl: data.screenMockupUrl || null,
+          documentationUrl: data.documentationUrl || null,
+          slug: data.slug,
+          techStack: data.techStack ?? null,
+          category: legacyCategory,
+          isActive: data.isActive,
+        })
+        .returning({ id: templates.id });
+    }
+
+    // Purge Next.js cached pages so the new product is visible immediately.
+    // Revalidation should never block successful creation.
+    try {
+      revalidatePath("/api/catalog");
+      revalidatePath("/products");
+      revalidatePath("/");
+    } catch {
+      // Ignore cache revalidation failures.
+    }
 
     return NextResponse.json(newTemplate ?? { id: null }, { status: 201 });
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Failed to create template" },
+      { status: 500 },
+    );
+  }
 }
