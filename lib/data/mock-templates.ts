@@ -17,6 +17,10 @@ export type TemplateItem = {
   techStack: string;
   updatedLabel: string;
   screenMockupUrl: string;
+  galleryImage1?: string | null;
+  galleryImage2?: string | null;
+  galleryImage3?: string | null;
+  galleryImage4?: string | null;
   vendor: {
     slug: string;
     name: string;
