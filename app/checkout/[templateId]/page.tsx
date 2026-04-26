@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth";
 import authOptions from "@/auth";
 import { CheckoutExperience } from "@/components/checkout/checkout-experience";
-import { getTemplateById } from "@/lib/db/queries";
+import { getTemplateById, getTemplateBySlug } from "@/lib/db/queries";
 
 type CheckoutPageProps = {
   params: Promise<{ templateId: string }>;
@@ -12,7 +12,7 @@ type CheckoutPageProps = {
 
 export async function generateMetadata({ params }: CheckoutPageProps): Promise<Metadata> {
   const { templateId } = await params;
-  const template = await getTemplateById(templateId);
+  const template = (await getTemplateById(templateId)) ?? (await getTemplateBySlug(templateId));
 
   if (!template) {
     return {
@@ -35,7 +35,7 @@ export default async function CheckoutPage({ params }: CheckoutPageProps) {
     redirect(`/auth?mode=signin&redirect=/checkout/${templateId}`);
   }
 
-  const template = await getTemplateById(templateId);
+  const template = (await getTemplateById(templateId)) ?? (await getTemplateBySlug(templateId));
 
   if (!template) {
     notFound();

@@ -14,6 +14,7 @@ export type TemplateItem = {
   rating: number;
   reviewCount: number;
   downloadCount: number;
+  viewCount: number;
   techStack: string;
   updatedLabel: string;
   screenMockupUrl: string;
@@ -55,6 +56,7 @@ export const mockTemplates: TemplateItem[] = [
     rating: 4.9,
     reviewCount: 184,
     downloadCount: 3200,
+    viewCount: 9800,
     techStack: "Next.js",
     updatedLabel: "Updated 3 days ago",
     screenMockupUrl: "https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=1200&auto=format&fit=crop&q=60",
@@ -80,6 +82,7 @@ export const mockTemplates: TemplateItem[] = [
     rating: 4.8,
     reviewCount: 122,
     downloadCount: 2100,
+    viewCount: 6400,
     techStack: "React",
     updatedLabel: "Updated this week",
     screenMockupUrl: "https://images.unsplash.com/photo-1461749280684-dccba630e2f6?w=1200&auto=format&fit=crop&q=60",
@@ -105,6 +108,7 @@ export const mockTemplates: TemplateItem[] = [
     rating: 5,
     reviewCount: 231,
     downloadCount: 4100,
+    viewCount: 12400,
     techStack: "Shopify",
     updatedLabel: "Updated yesterday",
     screenMockupUrl: "https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=1200&auto=format&fit=crop&q=60",
@@ -130,6 +134,7 @@ export const mockTemplates: TemplateItem[] = [
     rating: 4.7,
     reviewCount: 94,
     downloadCount: 1650,
+    viewCount: 5300,
     techStack: "Framer",
     updatedLabel: "Updated 2 weeks ago",
     screenMockupUrl: "https://images.unsplash.com/photo-1519741497674-611481863552?w=1200&auto=format&fit=crop&q=60",
@@ -188,6 +193,7 @@ const generatedTemplates: TemplateItem[] = Array.from({ length: 50 }).map((_, in
     rating: 4.2 + (index % 8) * 0.1,
     reviewCount: 14 + index * 3,
     downloadCount: 200 + index * 57,
+    viewCount: 500 + index * 91,
     techStack: stack,
     updatedLabel: index % 3 === 0 ? "Updated this week" : index % 2 === 0 ? "Updated yesterday" : "Updated 3 days ago",
     screenMockupUrl: imagePool[index % imagePool.length],

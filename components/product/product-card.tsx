@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowUpRight, BadgeCheck, Download, Monitor, Server, Sparkles, Star } from "lucide-react";
+import { ArrowUpRight, BadgeCheck, Download, Eye, Monitor, Server, Sparkles, Star } from "lucide-react";
 import { AddToCartButton } from "@/components/cart/add-to-cart-button";
 import { useCurrency } from "@/components/currency/currency-provider";
 import { WishlistButton } from "@/components/wishlist/wishlist-button";
@@ -59,19 +59,28 @@ export function ProductCard({ item, featured = false }: ProductCardProps) {
             {item.downloadCount.toLocaleString()}
           </span>
           <span className="inline-flex items-center gap-1.5 rounded border border-border px-2 py-1">
+            <Eye className="h-3 w-3" />
+            {item.viewCount.toLocaleString()}
+          </span>
+          <span className="inline-flex items-center gap-1.5 rounded border border-border px-2 py-1">
             <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
             {item.rating.toFixed(1)}
           </span>
-          <span className="inline-flex items-center gap-1.5 rounded border border-border px-2 py-1">
-            <Server className="h-3 w-3" />
-            {item.techStack}
-          </span>
         </div>
 
+        <span className="inline-flex w-fit items-center gap-1.5 rounded border border-border px-2 py-1 text-[11px] text-muted">
+          <Server className="h-3 w-3" />
+          {item.techStack}
+        </span>
+
         <p className="flex items-center gap-1.5 text-[11px] text-muted">
-          <Link href={`/vendors/${item.vendor.slug}`} className="underline decoration-transparent underline-offset-4 transition hover:text-foreground hover:decoration-current">
-            {item.vendor.name}
-          </Link>
+          {item.vendor.slug ? (
+            <Link href={`/vendors/${item.vendor.slug}`} className="underline decoration-transparent underline-offset-4 transition hover:text-foreground hover:decoration-current">
+              {item.vendor.name}
+            </Link>
+          ) : (
+            <span>{item.vendor.name}</span>
+          )}
           {item.vendor.verified ? <BadgeCheck className="h-4 w-4 text-blue-500" /> : null}
         </p>
 

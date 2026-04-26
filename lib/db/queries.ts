@@ -57,6 +57,7 @@ function toTemplateItem(row: TemplateRow): TemplateItem {
     rating: Number(row.avgRating ?? 0),
     reviewCount: Number(row.reviewCount ?? 0),
     downloadCount: Number(row.downloadCount ?? 0),
+    viewCount: Number(row.viewCount ?? 0),
     techStack: row.techStack ?? "Next.js",
     updatedLabel: row.updatedAt
       ? formatRelative(new Date(row.updatedAt))
@@ -67,7 +68,7 @@ function toTemplateItem(row: TemplateRow): TemplateItem {
     galleryImage3: row.galleryImage3,
     galleryImage4: row.galleryImage4,
     vendor: {
-      slug: row.vendorSlug ?? row.vendorId ?? "analite",
+      slug: row.vendorSlug ?? "analite",
       name: row.vendorName ?? row.vendorDisplayName ?? "Analite Studio",
       verified: Boolean(row.vendorVerified),
       bio: row.vendorBio ?? "",

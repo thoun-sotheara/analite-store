@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { BadgeCheck, Download, Server, Star, X, ChevronLeft, ChevronRight } from "lucide-react";
+import { BadgeCheck, Download, Eye, Server, Star, X, ChevronLeft, ChevronRight } from "lucide-react";
 import { AddToCartButton } from "@/components/cart/add-to-cart-button";
 import { useCatalog } from "@/components/catalog/catalog-provider";
 import { EngagementLoop } from "@/components/product/engagement-loop";
@@ -40,12 +40,13 @@ export default function ProductDetailPage() {
   const params = useParams<{ templateId: string }>();
   const { items, isLoading } = useCatalog();
   const { formatFromUsd } = useCurrency();
-  const template = items.find((item) => item.id === params.templateId);
+  const template = items.find((item) => item.id === params.templateId || item.slug === params.templateId);
   const { related } = useSmartRecommendations(template?.id);
   const [reviews, setReviews] = useState<TemplateReview[]>([]);
   const [mainImageUrl, setMainImageUrl] = useState<string>("");
   const [showZoomModal, setShowZoomModal] = useState(false);
   const [zoomImageUrl, setZoomImageUrl] = useState<string>("");
+  const [viewCount, setViewCount] = useState<number>(0);
 
   useEffect(() => {
     if (!template?.id) {
@@ -79,6 +80,10 @@ export default function ProductDetailPage() {
   }, [template?.screenMockupUrl]);
 
   useEffect(() => {
+    setViewCount(template?.viewCount ?? 0);
+  }, [template?.viewCount, template?.id]);
+
+  useEffect(() => {
     if (!template?.id) {
       return;
     }
@@ -86,7 +91,18 @@ export default function ProductDetailPage() {
     void fetch(`/api/catalog/${template.id}/view`, {
       method: "POST",
       cache: "no-store",
-    });
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((payload: { viewCount?: number } | null) => {
+        if (typeof payload?.viewCount === "number") {
+          setViewCount(payload.viewCount);
+        } else {
+          setViewCount((current) => current + 1);
+        }
+      })
+      .catch(() => {
+        setViewCount((current) => current + 1);
+      });
   }, [template?.id]);
 
   if (isLoading) {
@@ -207,6 +223,13 @@ export default function ProductDetailPage() {
               </span>
             </div>
             <div className="flex items-center justify-between rounded-md border border-border bg-surface p-2.5">
+              <span className="text-muted">Views</span>
+              <span className="flex items-center gap-1 font-semibold text-foreground">
+                <Eye className="h-3.5 w-3.5" />
+                {viewCount.toLocaleString()}
+              </span>
+            </div>
+            <div className="flex items-center justify-between rounded-md border border-border bg-surface p-2.5">
               <span className="text-muted">Stack</span>
               <span className="flex items-center gap-1 font-semibold text-foreground">
                 <Server className="h-3.5 w-3.5" />
@@ -216,9 +239,13 @@ export default function ProductDetailPage() {
             <div className="flex items-center justify-between rounded-md border border-border bg-surface p-2.5">
               <span className="text-muted">Vendor</span>
               <span className="inline-flex items-center gap-1.5">
-                <Link href={`/vendors/${template.vendor.slug}`} className="text-foreground underline underline-offset-2 hover:text-slate-600">
-                  {template.vendor.name}
-                </Link>
+                {template.vendor.slug ? (
+                  <Link href={`/vendors/${template.vendor.slug}`} className="text-foreground underline underline-offset-2 hover:text-slate-600">
+                    {template.vendor.name}
+                  </Link>
+                ) : (
+                  <span className="text-foreground">{template.vendor.name}</span>
+                )}
                 {template.vendor.verified ? <BadgeCheck className="h-4 w-4 text-blue-500" /> : null}
               </span>
             </div>
