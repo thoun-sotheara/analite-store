@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Package, Plus, Loader2, Check, X, Tag } from "lucide-react";
+import { uploadToFirebaseStorage } from "@/lib/firebase/storage-upload";
 
 // Compress an image file client-side using Canvas to avoid 413 errors on upload.
 async function compressImage(file: File, maxWidth = 1400, quality = 0.82): Promise<File> {
@@ -236,37 +237,56 @@ export function DbTemplateManager() {
     setFormErrors({});
 
     try {
-      // Compress images client-side before uploading to stay under Vercel's 4.5 MB body limit
+      // Step 1: Compress images client-side
+      setStatusMessage("Compressing images…");
       const [compressedImage, ...compressedGallery] = await Promise.all([
         compressImage(imageFile),
         ...galleryFiles.map((f) => (f ? compressImage(f) : Promise.resolve(null))),
       ]);
 
-      const payload = new FormData();
-      payload.set("title", form.title);
-      payload.set("description", form.description || "");
-      payload.set("slug", form.slug);
-      payload.set("priceUsd", form.priceUsd);
-      payload.set("previewUrl", form.previewUrl || "");
-      payload.set("documentationUrl", form.documentationUrl || "");
-      payload.set("techStack", form.techStack || "");
-      payload.set("category", form.category);
-      payload.set("categoryId", form.categoryId || "");
-      payload.set("vendorId", form.vendorId || "");
-      payload.set("isActive", String(form.isActive));
-      payload.set("zipFile", zipFile);
-      payload.set("imageFile", compressedImage);
+      // Step 2: Upload files directly to Firebase Storage (bypasses Vercel's 4.5 MB limit)
+      setStatusMessage("Uploading ZIP file…");
+      const uploadedZip = await uploadToFirebaseStorage(zipFile, "templates");
 
-      // Add compressed gallery images
-      compressedGallery.forEach((file, index) => {
-        if (file) {
-          payload.set(`galleryImage${index + 1}`, file);
+      setStatusMessage("Uploading mockup image…");
+      const uploadedImage = await uploadToFirebaseStorage(compressedImage, "images");
+
+      const galleryUrls: (string | null)[] = [];
+      for (let i = 0; i < compressedGallery.length; i++) {
+        const gf = compressedGallery[i];
+        if (gf) {
+          setStatusMessage(`Uploading gallery image ${i + 1}…`);
+          const uploaded = await uploadToFirebaseStorage(gf, "images");
+          galleryUrls.push(uploaded.publicUrl);
+        } else {
+          galleryUrls.push(null);
         }
-      });
+      }
 
+      // Step 3: Send only URLs + metadata as JSON to the API (no files, no size limit)
+      setStatusMessage("Saving to database…");
       const res = await fetch("/api/admin/templates", {
         method: "POST",
-        body: payload,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: form.title,
+          description: form.description || "",
+          slug: form.slug,
+          priceUsd: form.priceUsd,
+          previewUrl: form.previewUrl || "",
+          documentationUrl: form.documentationUrl || "",
+          techStack: form.techStack || "",
+          category: form.category,
+          categoryId: form.categoryId || undefined,
+          vendorId: form.vendorId || undefined,
+          isActive: form.isActive,
+          s3Key: uploadedZip.key,
+          screenMockupUrl: uploadedImage.publicUrl,
+          galleryImage1: galleryUrls[0] ?? "",
+          galleryImage2: galleryUrls[1] ?? "",
+          galleryImage3: galleryUrls[2] ?? "",
+          galleryImage4: galleryUrls[3] ?? "",
+        }),
       });
       const data = await res.json() as { error?: string; issues?: Record<string, string[]> };
       if (!res.ok) {
