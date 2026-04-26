@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { PreviewLayout } from "@/components/preview/preview-layout";
-import { mockTemplates } from "@/lib/data/mock-templates";
+import { getTemplateById } from "@/lib/db/queries";
 
 type PreviewByIdPageProps = {
   params: Promise<{ id: string }>;
@@ -8,7 +8,7 @@ type PreviewByIdPageProps = {
 
 export default async function PreviewByIdPage({ params }: PreviewByIdPageProps) {
   const { id } = await params;
-  const template = mockTemplates.find((item) => item.id === id);
+  const template = await getTemplateById(id);
 
   if (!template) {
     notFound();

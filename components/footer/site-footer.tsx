@@ -20,8 +20,8 @@ const groups = [
   {
     title: "Account",
     links: [
-      { href: "/auth?mode=signin", label: "Sign In" },
-      { href: "/auth?mode=signup", label: "Create Account" },
+      { href: "/auth?mode=signin", label: "Continue" },
+      { href: "/terms", label: "Terms & Conditions" },
       { href: "/cart", label: "Cart" },
     ],
   },
@@ -56,7 +56,7 @@ export function SiteFooter() {
         </section>
 
         <section className="mt-8 flex flex-col gap-3 border-t border-border pt-5 text-xs text-muted sm:flex-row sm:items-center sm:justify-between">
-          <p>Copyright {year} Analite Store. All rights reserved.</p>
+          <p>Copyright {year} Analite Kit. All rights reserved.</p>
           <p>Built for responsive storefront experiences across mobile, tablet, and desktop.</p>
         </section>
       </div>

@@ -1,14 +1,21 @@
 import Link from "next/link";
-import { cookies } from "next/headers";
+import Image from "next/image";
+import { redirect } from "next/navigation";
+import { getServerSession } from "next-auth";
 import { createDownloadLinkAction } from "@/app/actions/downloads";
+import authOptions from "@/auth";
 import { DownloadButton } from "@/components/download-button";
 import { getLibraryItems } from "@/lib/library/get-library-items";
 
 export default async function LibraryPage() {
-  const cookieStore = await cookies();
-  const demoEmail = cookieStore.get("demo_user_email")?.value ?? "demo@analite.store";
-  const demoName = cookieStore.get("demo_user_name")?.value ?? "Demo User";
-  const items = await getLibraryItems(demoEmail);
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.email) {
+    redirect("/auth?mode=signin&redirect=/library");
+  }
+
+  const userEmail = session.user.email;
+  const userName = session.user.name ?? "Account User";
+  const items = await getLibraryItems(userEmail);
 
   return (
     <main className="mx-auto w-full max-w-7xl px-4 pb-24 pt-10 sm:px-10 lg:px-16">
@@ -16,17 +23,24 @@ export default async function LibraryPage() {
         Personal Library
       </h1>
       <p className="mt-4 text-sm text-muted sm:text-base">
-        {`Logged in as ${decodeURIComponent(demoName)} (${decodeURIComponent(demoEmail)})`}
+        {`Logged in as ${userName} (${userEmail})`}
       </p>
 
       <section className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3 lg:[grid-auto-rows:1fr]">
         {items.map((item) => {
-          const action = createDownloadLinkAction.bind(null, item.transactionId, item.s3Key);
+          const action = createDownloadLinkAction.bind(null, item.transactionId, item.templateId);
 
           return (
             <article key={item.transactionId} className="flex h-full flex-col rounded-lg border border-border bg-white">
-              <div className="aspect-video overflow-hidden rounded-t-lg border-b border-border bg-surface">
-                <img src={item.thumbnailUrl} alt={item.title} className="h-full w-full object-cover" />
+              <div className="relative aspect-video overflow-hidden rounded-t-lg border-b border-border bg-surface">
+                <Image
+                  src={item.thumbnailUrl}
+                  alt={item.title}
+                  fill
+                  sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                  className="object-cover"
+                  unoptimized
+                />
               </div>
               <div className="flex h-full flex-col p-6 sm:p-8">
                 <h2 className="line-clamp-2 text-[1.25rem] font-medium text-foreground">
@@ -46,7 +60,7 @@ export default async function LibraryPage() {
                       Download Invoice
                     </Link>
                     <Link
-                      href={item.documentationUrl}
+                      href={item.documentationUrl || "/support"}
                       target="_blank"
                       className="inline-flex rounded-md border border-border px-4 py-2 text-sm text-muted transition hover:border-slate-400 hover:text-foreground"
                     >

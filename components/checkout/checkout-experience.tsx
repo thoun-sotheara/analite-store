@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Link from "next/link";
 import { PaymentModal } from "@/components/payment-modal";
 
 type CheckoutExperienceProps = {
@@ -11,7 +10,7 @@ type CheckoutExperienceProps = {
   basePriceUsd: number;
 };
 
-type Step = 1 | 2 | 3;
+type Step = 1 | 2;
 
 const TAX_RATE = 0;
 
@@ -32,6 +31,7 @@ export function CheckoutExperience({
   const [quantity, setQuantity] = useState(1);
   const [couponInput, setCouponInput] = useState("");
   const [appliedCoupon, setAppliedCoupon] = useState("");
+  const [message, setMessage] = useState("");
 
   const pricing = useMemo(() => {
     const subtotal = basePriceUsd * quantity;
@@ -63,9 +63,6 @@ export function CheckoutExperience({
           <span className={`rounded-full px-3 py-1 ${step >= 2 ? "bg-foreground text-white" : "border border-border text-muted"}`}>
             2. Payment
           </span>
-          <span className={`rounded-full px-3 py-1 ${step >= 3 ? "bg-foreground text-white" : "border border-border text-muted"}`}>
-            3. Success
-          </span>
         </div>
 
         {step === 1 ? (
@@ -75,16 +72,32 @@ export function CheckoutExperience({
               <div className="mt-2 inline-flex items-center gap-2 rounded-md border border-border p-1">
                 <button
                   type="button"
-                  onClick={() => setQuantity((value) => Math.max(1, value - 1))}
-                  className="rounded px-3 py-1 text-sm hover:bg-white"
+                  onClick={() => {
+                    setQuantity((value) => {
+                      if (value <= 1) {
+                        setMessage("Minimum quantity is 1.");
+                        return 1;
+                      }
+                      return value - 1;
+                    });
+                  }}
+                  className="rounded px-3 py-1 text-sm transition hover:bg-white"
                 >
                   -
                 </button>
                 <span className="min-w-8 text-center text-sm">{quantity}</span>
                 <button
                   type="button"
-                  onClick={() => setQuantity((value) => Math.min(5, value + 1))}
-                  className="rounded px-3 py-1 text-sm hover:bg-white"
+                  onClick={() => {
+                    setQuantity((value) => {
+                      if (value >= 5) {
+                        setMessage("Maximum quantity per checkout is 5.");
+                        return 5;
+                      }
+                      return value + 1;
+                    });
+                  }}
+                  className="rounded px-3 py-1 text-sm transition hover:bg-white"
                 >
                   +
                 </button>
@@ -103,8 +116,24 @@ export function CheckoutExperience({
                 />
                 <button
                   type="button"
-                  onClick={() => setAppliedCoupon(couponInput)}
-                  className="rounded-md border border-border px-4 py-2 text-sm hover:border-slate-400"
+                  onClick={() => {
+                    const candidate = couponInput.trim();
+                    if (!candidate) {
+                      setMessage("Please enter a coupon code first.");
+                      return;
+                    }
+
+                    const discountRule = getDiscountRate(candidate);
+                    if (!discountRule) {
+                      setAppliedCoupon("");
+                      setMessage("Coupon not recognized. Try SAVE10 or KHMER5.");
+                      return;
+                    }
+
+                    setAppliedCoupon(candidate);
+                    setMessage(`Coupon ${candidate.toUpperCase()} applied.`);
+                  }}
+                  className="rounded-md border border-border px-4 py-2 text-sm transition hover:border-slate-400"
                 >
                   Apply
                 </button>
@@ -113,64 +142,49 @@ export function CheckoutExperience({
 
             <button
               type="button"
-              onClick={() => setStep(2)}
+              onClick={() => {
+                setMessage("");
+                setStep(2);
+              }}
               className="rounded-md bg-foreground px-4 py-2 text-sm text-white transition hover:bg-slate-800"
             >
               Continue to Payment
             </button>
+
+            {message ? <p className="text-xs text-muted">{message}</p> : null}
           </div>
         ) : null}
 
         {step === 2 ? (
           <div className="mt-6 space-y-4">
             <p className="rounded-md border border-border p-3 text-sm text-muted">
-              Complete payment using the modal below. After paying, click continue.
+              Open payment modal, generate QR, complete payment, then continue once confirmation is received.
             </p>
-            <PaymentModal templateId={templateId} templateTitle={templateTitle} amountUsd={pricing.total} />
-            <div className="flex flex-wrap gap-3">
-              <button
-                type="button"
-                onClick={() => setStep(1)}
-                className="rounded-md border border-border px-4 py-2 text-sm text-foreground"
-              >
-                Back
-              </button>
-              <button
-                type="button"
-                onClick={() => setStep(3)}
-                className="rounded-md bg-foreground px-4 py-2 text-sm text-white"
-              >
-                Continue to Success
-              </button>
+            <div className="rounded-md border border-border bg-white p-3 text-xs text-muted">
+              <p className="font-medium text-foreground">Checkout Steps</p>
+              <ol className="mt-2 list-decimal space-y-1 pl-5">
+                <li>Click Purchase below.</li>
+                <li>Select provider and generate payment QR.</li>
+                <li>Scan/pay, then wait for redirect or continue manually.</li>
+              </ol>
             </div>
+            <PaymentModal templateId={templateId} templateTitle={templateTitle} amountUsd={pricing.total} />
+            <button
+              type="button"
+              onClick={() => setStep(1)}
+              className="rounded-md border border-border px-4 py-2 text-sm text-foreground transition hover:border-slate-400"
+            >
+              Back
+            </button>
           </div>
         ) : null}
 
-        {step === 3 ? (
-          <div className="mt-6 space-y-4">
-            <p className="rounded-md border border-border p-3 text-sm text-muted">
-              Payment step completed for testing. Visit success and library flows.
-            </p>
-            <div className="flex flex-wrap gap-3">
-              <Link
-                href={`/success?template=${templateId}&tx=demo-${templateId}`}
-                className="rounded-md bg-foreground px-4 py-2 text-sm text-white"
-              >
-                Open Success Page
-              </Link>
-              <Link
-                href="/library"
-                className="rounded-md border border-border px-4 py-2 text-sm text-foreground"
-              >
-                Open Library
-              </Link>
-            </div>
-          </div>
-        ) : null}
+
       </section>
 
       <aside className="sticky top-4 h-fit rounded-lg border border-border bg-white p-4 sm:p-8">
         <h2 className="text-lg font-semibold text-foreground">Order Summary</h2>
+        <p className="mt-1 text-xs text-muted">{templateTitle}</p>
 
         <div className="mt-4 space-y-2 text-sm">
           <div className="flex items-center justify-between">
@@ -192,6 +206,10 @@ export function CheckoutExperience({
           <div className="flex items-center justify-between">
             <span className="text-muted">Tax (placeholder)</span>
             <span>${pricing.tax.toFixed(2)}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-muted">Delivery</span>
+            <span>$0.00 (digital)</span>
           </div>
         </div>
 

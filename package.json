@@ -1,32 +1,37 @@
 {
-  "name": "analite-store",
+  "name": "analite-kit",
   "version": "0.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "check:env": "node scripts/check-env.mjs",
+    "check:env:strict": "node scripts/check-env.mjs --strict"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1035.0",
     "@aws-sdk/s3-request-presigner": "^3.1035.0",
     "clsx": "^2.1.1",
     "drizzle-orm": "^0.45.2",
+    "firebase": "^12.12.1",
     "lucide-react": "^1.9.0",
-    "next": "^15.3.3",
+    "next": "^16.2.4",
     "next-auth": "^4.24.14",
     "nodemailer": "^7.0.13",
     "pdf-lib": "^1.17.1",
     "postgres": "^3.4.9",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "react-qr-code": "^2.0.18",
     "tailwind-merge": "^3.5.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
+    "@types/nodemailer": "^8.0.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "drizzle-kit": "^0.31.10",

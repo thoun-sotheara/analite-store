@@ -1,6 +1,6 @@
 const authConfig = {
   pages: {
-    signIn: "/",
+    signIn: "/auth",
   },
   session: {
     strategy: "jwt" as const,

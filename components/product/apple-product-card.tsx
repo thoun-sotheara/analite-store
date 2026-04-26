@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { BadgeCheck, ExternalLink, Star } from "lucide-react";
 import { useCurrency } from "@/components/currency/currency-provider";
@@ -19,12 +20,14 @@ export function AppleProductCard({ item, featured = false }: AppleProductCardPro
         featured ? "p-16" : "p-12"
       }`}
     >
-      <div className="overflow-hidden rounded-2xl border border-border bg-surface">
-        <img
+      <div className="relative h-52 overflow-hidden rounded-2xl border border-border bg-surface">
+        <Image
           src={item.screenMockupUrl}
           alt={`${item.title} mockup`}
-          className="h-52 w-full object-cover"
-          loading="lazy"
+          fill
+          sizes="(max-width: 768px) 100vw, 50vw"
+          className="object-cover"
+          unoptimized
         />
       </div>
 
@@ -68,10 +71,10 @@ export function AppleProductCard({ item, featured = false }: AppleProductCardPro
           Buy Template
         </Link>
         <Link
-          href={`/preview/${item.slug}`}
+          href={`/preview/${item.id}`}
           className="inline-flex items-center gap-2 rounded-full border border-border px-5 py-2.5 text-sm text-muted transition hover:border-slate-400 hover:text-foreground"
         >
-          Live Demo
+          Preview
           <ExternalLink className="h-4 w-4" />
         </Link>
       </div>

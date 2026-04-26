@@ -14,7 +14,7 @@ type OrderItem = {
 };
 
 const orders: OrderItem[] = [
-  { id: "ORD-1001", buyer: "demo@analite.store", product: "Khmer Shopfront", amount: 79, status: "Completed", date: "2026-04-23" },
+  { id: "ORD-1001", buyer: "buyer@analite.store", product: "Khmer Shopfront", amount: 79, status: "Completed", date: "2026-04-23" },
   { id: "ORD-1002", buyer: "agency@borey.studio", product: "Phnom Villa Pro", amount: 49, status: "Pending", date: "2026-04-22" },
   { id: "ORD-1003", buyer: "events@everafter.kh", product: "Moonlight Invitation", amount: 29, status: "Completed", date: "2026-04-21" },
   { id: "ORD-1004", buyer: "creator@studionine.design", product: "Creator Profile One", amount: 39, status: "Refunded", date: "2026-04-20" },

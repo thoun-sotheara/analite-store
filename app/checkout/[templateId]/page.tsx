@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
-import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { redirect } from "next/navigation";
+import { getServerSession } from "next-auth";
+import authOptions from "@/auth";
 import { CheckoutExperience } from "@/components/checkout/checkout-experience";
-import { mockTemplates } from "@/lib/data/mock-templates";
+import { getTemplateById } from "@/lib/db/queries";
 
 type CheckoutPageProps = {
   params: Promise<{ templateId: string }>;
@@ -11,30 +12,30 @@ type CheckoutPageProps = {
 
 export async function generateMetadata({ params }: CheckoutPageProps): Promise<Metadata> {
   const { templateId } = await params;
-  const template = mockTemplates.find((item) => item.id === templateId);
+  const template = await getTemplateById(templateId);
 
   if (!template) {
     return {
-      title: "Template Not Found | Analite Store",
+      title: "Template Not Found | Analite Kit",
     };
   }
 
   return {
-    title: `${template.title} | Analite Store`,
+    title: `${template.title} | Analite Kit`,
     description: template.description,
   };
 }
 
 export default async function CheckoutPage({ params }: CheckoutPageProps) {
   const { templateId } = await params;
-  const cookieStore = await cookies();
-  const hasAccount = Boolean(cookieStore.get("demo_user_email")?.value);
+  const session = await getServerSession(authOptions);
+  const hasAccount = Boolean(session?.user?.email);
 
   if (!hasAccount) {
     redirect(`/auth?mode=signin&redirect=/checkout/${templateId}`);
   }
 
-  const template = mockTemplates.find((item) => item.id === templateId);
+  const template = await getTemplateById(templateId);
 
   if (!template) {
     notFound();

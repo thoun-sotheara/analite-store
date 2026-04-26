@@ -28,7 +28,7 @@ export function ReviewList({ rating, reviewCount, reviews }: ReviewListProps) {
         <article className="elevated-card rounded-lg p-6">
           <p className="text-sm text-muted">Verified Reviews</p>
           <p className="mt-2 text-3xl font-semibold text-foreground">{reviewCount}</p>
-          <p className="mt-2 text-sm text-muted">Collected from completed demo orders and storefront feedback.</p>
+            <p className="mt-2 text-sm text-muted">Collected from completed orders and storefront feedback.</p>
         </article>
         <article className="elevated-card rounded-lg p-6">
           <p className="text-sm text-muted">Would Recommend</p>

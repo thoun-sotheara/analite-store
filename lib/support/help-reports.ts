@@ -1,33 +1,33 @@
+"use client";
+
 export type HelpReport = {
   id: string;
   email: string;
   subject: string;
   message: string;
   createdAt: string;
+  createdAtMs: number;
   status: "new" | "reviewed";
 };
 
-export const HELP_REPORTS_KEY = "analite_help_reports_v1";
+export async function appendHelpReport(report: Omit<HelpReport, "id" | "createdAt" | "createdAtMs">) {
+  const res = await fetch("/api/support/tickets", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      email: report.email,
+      subject: report.subject,
+      message: report.message,
+    }),
+  });
 
-export function readHelpReports(): HelpReport[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = window.localStorage.getItem(HELP_REPORTS_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as HelpReport[];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error((data as { error?: string }).error ?? "Failed to submit support ticket");
   }
 }
 
-export function writeHelpReports(reports: HelpReport[]) {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(HELP_REPORTS_KEY, JSON.stringify(reports));
-  window.dispatchEvent(new CustomEvent("analite-help-reports-updated"));
-}
-
-export function appendHelpReport(report: HelpReport) {
-  const current = readHelpReports();
-  writeHelpReports([report, ...current]);
+// No-op stub kept for backward compatibility — real-time is handled by polling in the admin UI
+export function subscribeHelpReports(_callback: (reports: HelpReport[]) => void): () => void {
+  return () => {};
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useActionState, useEffect, useMemo, useState } from "react";
 import type { PaymentSession } from "@/lib/payments/types";
@@ -102,10 +103,13 @@ export function PurchaseCard({
           <p className="text-xs uppercase tracking-[0.15em] text-accent">Expires In</p>
           <p className="mt-1 font-mono text-2xl">{clock}</p>
 
-          <img
+          <Image
             src={state.qrImageUrl}
             alt="KHQR code"
-            className="mt-3 h-52 w-52 rounded-lg border border-border bg-white p-2"
+            width={208}
+            height={208}
+            className="mt-3 rounded-lg border border-border bg-white p-2"
+            unoptimized
           />
 
           <div className="mt-4 space-y-2 text-sm text-muted">
@@ -114,7 +118,7 @@ export function PurchaseCard({
           </div>
 
           <Link
-            href={`/success?tx=${state.transactionId}&template=${templateId}`}
+            href={`/success?tx=${state.transactionId}`}
             className="mt-4 inline-flex w-full items-center justify-center rounded-lg border border-accent px-3 py-2 text-sm text-accent transition hover:bg-accent/10"
           >
             I Paid, Continue

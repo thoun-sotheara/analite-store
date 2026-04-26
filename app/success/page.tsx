@@ -1,41 +1,168 @@
+import { and, eq } from "drizzle-orm";
 import Link from "next/link";
+import { notFound, redirect } from "next/navigation";
+import { Suspense } from "react";
+import { getServerSession } from "next-auth";
+import authOptions from "@/auth";
 import { createDownloadLinkAction } from "@/app/actions/downloads";
+import { ClearCartOnSuccess } from "@/components/cart/clear-cart-on-success";
 import { ConfettiOverlay } from "@/components/confetti-overlay";
 import { DownloadButton } from "@/components/download-button";
-import { mockTemplates } from "@/lib/data/mock-templates";
+import { db } from "@/lib/db";
+import { purchases, templates, transactions, users } from "@/lib/db/schema";
 
 type SuccessPageProps = {
-  searchParams: Promise<{ tx?: string; template?: string }>;
+  searchParams: Promise<{ tx?: string }>;
 };
 
 export default async function SuccessPage({ searchParams }: SuccessPageProps) {
+  const session = await getServerSession(authOptions);
+  const userEmail = session?.user?.email?.toLowerCase();
+
+  if (!userEmail) {
+    redirect("/auth?mode=signin&redirect=/success");
+  }
+
   const params = await searchParams;
   const transactionId = params.tx ?? "";
-  const templateId = params.template ?? "";
-  const template = mockTemplates.find((item) => item.id === templateId);
-  const relatedTemplates = template
-    ? mockTemplates.filter((item) => item.id !== template.id && item.category === template.category).slice(0, 2)
-    : mockTemplates.slice(0, 2);
 
-  const action = createDownloadLinkAction.bind(
-    null,
-    transactionId,
-    template?.s3Key ?? "",
-  );
+  if (!transactionId) {
+    notFound();
+  }
+
+  let purchasedTemplateIds: string[] = [];
+  let purchasedTemplates: Array<{ id: string; title: string }> = [];
+  let relatedTemplates: Array<{ id: string; title: string }> = [];
+  let hasAuthorizedPurchase = false;
+  if (db) {
+    const [owner] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.email, userEmail))
+      .limit(1);
+
+    if (!owner) {
+      notFound();
+    }
+
+    const [transaction] = await db
+      .select({ id: transactions.id })
+      .from(transactions)
+      .where(
+        and(
+          eq(transactions.id, transactionId),
+          eq(transactions.userEmail, userEmail),
+          eq(transactions.status, "completed"),
+        ),
+      )
+      .limit(1);
+
+    if (!transaction) {
+      notFound();
+    }
+
+    if (owner) {
+      const rows = await db
+        .select({
+          templateId: purchases.templateId,
+          templateTitle: templates.title,
+        })
+        .from(purchases)
+        .innerJoin(
+          transactions,
+          and(
+            eq(transactions.id, purchases.transactionId),
+            eq(transactions.userEmail, userEmail),
+            eq(transactions.status, "completed"),
+          ),
+        )
+        .innerJoin(templates, eq(templates.id, purchases.templateId))
+        .where(
+          and(
+            eq(purchases.userId, owner.id),
+            eq(purchases.transactionId, transactionId),
+            eq(purchases.status, "COMPLETED"),
+          ),
+        );
+
+      if (rows.length === 0) {
+        notFound();
+      }
+
+      hasAuthorizedPurchase = true;
+
+      purchasedTemplateIds = rows.map((row) => row.templateId);
+
+      purchasedTemplates = rows.map((row) => ({
+        id: row.templateId,
+        title: row.templateTitle,
+      }));
+
+      if (purchasedTemplateIds.length > 0) {
+        const candidates = await db
+          .select({
+            id: templates.id,
+            title: templates.title,
+          })
+          .from(templates)
+          .limit(12);
+
+        relatedTemplates = candidates
+          .filter((item) => !purchasedTemplateIds.includes(item.id))
+          .slice(0, 2);
+      }
+    }
+  }
+
+  if (!hasAuthorizedPurchase) {
+    notFound();
+  }
 
   return (
     <main className="mx-auto w-full max-w-xl px-4 pb-20 pt-8 sm:px-6">
       <section className="glass-card relative overflow-hidden rounded-3xl p-6 sm:p-8">
+        <Suspense fallback={null}><ClearCartOnSuccess /></Suspense>
         <ConfettiOverlay />
+        <div className="relative z-10">
         <p className="text-xs uppercase tracking-[0.16em] text-accent">Payment Success</p>
         <h1 className="mt-3 text-3xl font-semibold">Your template is ready</h1>
         <p className="mt-3 text-sm text-muted">
           Transaction <span className="font-mono text-foreground">{transactionId || "N/A"}</span>
           {" "}
-          was confirmed. Generate your instant secure download link below.
+          was confirmed. Your purchased items are ready for secure download.
         </p>
 
-        <DownloadButton action={action} />
+        <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50/80 p-4">
+          <p className="text-xs uppercase tracking-[0.14em] text-emerald-700">Receipt</p>
+          <p className="mt-2 text-sm text-emerald-900">
+            A payment receipt is ready for accounting and records.
+          </p>
+          <Link
+            href={`/api/invoice/${transactionId}`}
+            target="_blank"
+            className="mt-3 inline-flex rounded-md bg-emerald-700 px-4 py-2 text-sm text-white transition hover:bg-emerald-800"
+          >
+            Download Receipt (PDF)
+          </Link>
+        </div>
+
+        {purchasedTemplates.length === 0 ? (
+          <p className="mt-4 rounded-md border border-border px-3 py-2 text-sm text-muted">
+            Your library is being updated. If items do not appear in a moment, open your library page.
+          </p>
+        ) : (
+          <div className="mt-4 space-y-4">
+            {purchasedTemplates.map((template) => {
+              const action = createDownloadLinkAction.bind(null, transactionId, template.id);
+              return (
+                <div key={template.id} className="rounded-xl border border-border bg-white/80 p-4">
+                  <p className="text-sm font-semibold text-foreground">{template.title}</p>
+                  <DownloadButton action={action} />
+                </div>
+              );
+            })}
+          </div>
+        )}
 
         <div className="mt-4 flex flex-col gap-3 sm:flex-row">
           <Link href="/library" className="inline-flex rounded-md border border-border px-4 py-2 text-sm text-foreground">
@@ -62,6 +189,7 @@ export default async function SuccessPage({ searchParams }: SuccessPageProps) {
               </Link>
             ))}
           </div>
+        </div>
         </div>
       </section>
     </main>

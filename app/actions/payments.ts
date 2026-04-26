@@ -1,11 +1,12 @@
 "use server";
 
 import { randomUUID } from "crypto";
+import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { transactions } from "@/lib/db/schema";
-import { mockTemplates } from "@/lib/data/mock-templates";
+import { templates, transactions } from "@/lib/db/schema";
 import { buildBakongKhqr, getKhqrImageUrl } from "@/lib/payments/bakong-khqr";
 import { createAbaPaymentPayload, signAbaPayload } from "@/lib/payments/aba-payway";
+import { toDbTemplateId } from "@/lib/payments/template-id-map";
 import { emptyPaymentSession, type PaymentSession } from "@/lib/payments/types";
 
 export async function initiatePaymentAction(
@@ -13,9 +14,21 @@ export async function initiatePaymentAction(
   _state: PaymentSession,
   formData: FormData,
 ): Promise<PaymentSession> {
-  const selectedTemplate = mockTemplates.find((item) => item.id === templateId);
+  if (!db) {
+    return {
+      ...emptyPaymentSession,
+      message: "Payment service is temporarily unavailable.",
+    };
+  }
 
-  if (!selectedTemplate) {
+  const dbTemplateId = toDbTemplateId(templateId);
+  const [selectedTemplate] = await db
+    .select({ id: templates.id, priceUsd: templates.priceUsd, isActive: templates.isActive })
+    .from(templates)
+    .where(eq(templates.id, dbTemplateId))
+    .limit(1);
+
+  if (!selectedTemplate || !selectedTemplate.isActive) {
     return {
       ...emptyPaymentSession,
       message: "Template not found.",
@@ -37,16 +50,24 @@ export async function initiatePaymentAction(
 
   const transactionId = randomUUID();
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
-  const amount = selectedTemplate.priceUsd;
+  const amount = Number(selectedTemplate.priceUsd);
+
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return {
+      ...emptyPaymentSession,
+      provider,
+      message: "Template price is invalid.",
+    };
+  }
 
   let khqrString = "";
 
   if (provider === "aba") {
     const payload = createAbaPaymentPayload({
-      merchantId: process.env.ABA_MERCHANT_ID ?? "demo-merchant",
+      merchantId: process.env.ABA_MERCHANT_ID ?? "sandbox-merchant",
       amount,
       transactionId,
-      returnUrl: `${process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"}/success?tx=${transactionId}&template=${templateId}`,
+      returnUrl: `${process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"}/success?tx=${transactionId}`,
     });
 
     const signature = signAbaPayload(
@@ -58,24 +79,28 @@ export async function initiatePaymentAction(
   } else {
     khqrString = buildBakongKhqr({
       merchantId: process.env.BAKONG_MERCHANT_ID ?? "0000000000",
-      merchantName: process.env.BAKONG_MERCHANT_NAME ?? "Analite Store",
+      merchantName: process.env.BAKONG_MERCHANT_NAME ?? "Analite Kit",
       amount,
       transactionRef: transactionId,
     });
   }
 
   try {
-    await db?.insert(transactions).values({
+    await db.insert(transactions).values({
       id: transactionId,
       userEmail,
       status: "pending",
       amount: amount.toFixed(2),
       provider,
-      templateId,
+      templateId: dbTemplateId,
       khqrPayload: khqrString,
     });
   } catch {
-    // Allow local development to continue when DB is not connected.
+    return {
+      ...emptyPaymentSession,
+      provider,
+      message: "Unable to create the payment session.",
+    };
   }
 
   return {

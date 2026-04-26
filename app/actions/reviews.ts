@@ -5,12 +5,14 @@ import { getServerSession } from "next-auth";
 import authOptions from "@/auth";
 import { db } from "@/lib/db";
 import { purchases, reviews, users } from "@/lib/db/schema";
+import { toDbTemplateId } from "@/lib/payments/template-id-map";
 
 export async function submitReviewAction(
   templateId: string,
   rating: "1" | "2" | "3" | "4" | "5",
   comment?: string,
 ) {
+  const dbTemplateId = toDbTemplateId(templateId);
   const session = await getServerSession(authOptions);
 
   if (!db || !session?.user?.email) {
@@ -33,7 +35,7 @@ export async function submitReviewAction(
     .where(
       and(
         eq(purchases.userId, user.id),
-        eq(purchases.templateId, templateId),
+        eq(purchases.templateId, dbTemplateId),
         eq(purchases.status, "COMPLETED"),
       ),
     )
@@ -45,7 +47,7 @@ export async function submitReviewAction(
 
   await db.insert(reviews).values({
     userId: user.id,
-    templateId,
+    templateId: dbTemplateId,
     purchaseId: purchase.id,
     rating,
     comment,

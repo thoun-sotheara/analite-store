@@ -1,35 +1,39 @@
 "use server";
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { createHash } from "crypto";
 import { cookies } from "next/headers";
 import { getServerSession } from "next-auth";
 import type { DownloadState } from "@/app/actions/download-types";
 import authOptions from "@/auth";
-import { DEMO_MODE } from "@/lib/config/demo";
 import { db } from "@/lib/db";
-import { downloadActivities, purchases, transactions, users } from "@/lib/db/schema";
+import { downloadActivities, purchases, templates, transactions, users } from "@/lib/db/schema";
+import { toDbTemplateId } from "@/lib/payments/template-id-map";
 import { generateSecureTemplateDownloadUrl } from "@/lib/storage/secure-download";
 
 export async function createDownloadLinkAction(
   transactionId: string,
-  s3Key: string,
-  _state: DownloadState,
+  templateId: string,
+  state: DownloadState,
 ): Promise<DownloadState> {
-  if (!transactionId || !s3Key) {
+  void state;
+
+  if (!transactionId || !templateId) {
     return {
       ok: false,
       url: "",
-      message: "Missing transaction or file reference.",
+      message: "Missing transaction or template reference.",
     };
   }
 
   try {
-    if (DEMO_MODE) {
+    const dbTemplateId = toDbTemplateId(templateId);
+
+    if (!db) {
       return {
-        ok: true,
-        url: `/api/demo/download?tx=${transactionId}`,
-        message: "Demo download generated successfully.",
+        ok: false,
+        url: "",
+        message: "Download service is temporarily unavailable.",
       };
     }
 
@@ -48,81 +52,83 @@ export async function createDownloadLinkAction(
       };
     }
 
-    if (db) {
-      const [record] = await db
-        .select()
-        .from(transactions)
-        .where(
-          and(
-            eq(transactions.id, transactionId),
-            eq(transactions.status, "completed"),
-            eq(transactions.userEmail, session.user.email),
+    const [record] = await db
+      .select()
+      .from(transactions)
+      .where(
+        and(
+          eq(transactions.id, transactionId),
+          eq(transactions.status, "completed"),
+          eq(transactions.userEmail, session.user.email),
+        ),
+      )
+      .limit(1);
+
+    if (!record) {
+      return {
+        ok: false,
+        url: "",
+        message: "Payment not completed yet.",
+      };
+    }
+
+    const [linkedUser] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.email, session.user.email))
+      .limit(1);
+
+    if (!linkedUser) {
+      return {
+        ok: false,
+        url: "",
+        message: "Account is not ready for downloads yet.",
+      };
+    }
+
+    const [purchase] = await db
+      .select({
+        id: purchases.id,
+        s3Key: templates.s3Key,
+      })
+      .from(purchases)
+      .innerJoin(templates, eq(templates.id, purchases.templateId))
+      .where(
+        and(
+            eq(purchases.userId, linkedUser.id),
+            eq(purchases.transactionId, record.id),
+            eq(purchases.templateId, dbTemplateId),
+            eq(purchases.status, "COMPLETED"),
           ),
         )
-        .limit(1);
+      .limit(1);
 
-      if (!record) {
-        return {
-          ok: false,
-          url: "",
-          message: "Payment not completed yet.",
-        };
-      }
-
-      const [linkedUser] = await db
-        .select({ id: users.id })
-        .from(users)
-        .where(eq(users.email, session.user.email))
-        .limit(1);
-
-      if (linkedUser) {
-        const [purchase] = await db
-          .select({ id: purchases.id })
-          .from(purchases)
-          .where(
-            and(
-              eq(purchases.userId, linkedUser.id),
-              eq(purchases.templateId, record.templateId),
-              eq(purchases.status, "COMPLETED"),
-            ),
-          )
-          .limit(1);
-
-        if (!purchase) {
-          return {
-            ok: false,
-            url: "",
-            message: "No completed purchase is linked to this account.",
-          };
-        }
-
-        const url = await generateSecureTemplateDownloadUrl({
-          s3Key,
-          sessionId,
-          transactionId,
-        });
-
-        await db.insert(downloadActivities).values({
-          purchaseId: purchase.id,
-          transactionId,
-          userId: linkedUser.id,
-          sessionIdHash: createHash("sha256").update(sessionId).digest("hex"),
-          downloadUrl: url,
-        });
-
-        return {
-          ok: true,
-          url,
-          message: "Your download is ready. Link expires in 60 minutes.",
-        };
-      }
+    if (!purchase) {
+      return {
+        ok: false,
+        url: "",
+        message: "No completed purchase is linked to this account.",
+      };
     }
 
     const url = await generateSecureTemplateDownloadUrl({
-      s3Key,
+      s3Key: purchase.s3Key,
       sessionId,
       transactionId,
     });
+
+    await db.insert(downloadActivities).values({
+      purchaseId: purchase.id,
+      transactionId,
+      userId: linkedUser.id,
+      sessionIdHash: createHash("sha256").update(sessionId).digest("hex"),
+      downloadUrl: url,
+    });
+
+    await db
+      .update(templates)
+      .set({ downloadCount: sql`${templates.downloadCount} + 1` })
+      .where(eq(templates.id, dbTemplateId));
 
     return {
       ok: true,

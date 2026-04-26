@@ -1,12 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { useSession } from "next-auth/react";
 import { appendHelpReport } from "@/lib/support/help-reports";
 
 const faqs = [
   {
-    title: "How do downloads work in demo mode?",
-    body: "Demo mode issues placeholder downloads so you can validate the full buyer journey before wiring production storage.",
+    title: "How do secure downloads work?",
+    body: "Downloads are generated as time-limited secure links after successful payment verification.",
   },
   {
     title: "Where can buyers find invoices?",
@@ -19,24 +20,27 @@ const faqs = [
 ];
 
 export default function SupportPage() {
+  const { data: session } = useSession();
   const [email, setEmail] = useState("");
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
   const [notice, setNotice] = useState("");
 
-  function submitIssue(event: React.FormEvent<HTMLFormElement>) {
+  async function submitIssue(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    appendHelpReport({
-      id: `help-${Date.now()}`,
-      email,
-      subject,
-      message,
-      createdAt: new Date().toISOString(),
-      status: "new",
-    });
-    setNotice("Your issue was submitted. Admin will see it in dashboard alerts.");
-    setSubject("");
-    setMessage("");
+    try {
+      await appendHelpReport({
+        email: email || session?.user?.email || "",
+        subject,
+        message,
+        status: "new",
+      });
+      setNotice("Your issue was submitted. Admin will see it in dashboard alerts.");
+      setSubject("");
+      setMessage("");
+    } catch {
+      setNotice("Unable to submit issue right now. Please try again.");
+    }
   }
 
   return (
@@ -75,7 +79,7 @@ export default function SupportPage() {
           <input
             required
             type="email"
-            value={email}
+            value={email || session?.user?.email || ""}
             onChange={(event) => setEmail(event.target.value)}
             placeholder="Your email"
             className="rounded-md border border-border px-3 py-2 text-sm outline-none"

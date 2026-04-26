@@ -2,9 +2,8 @@ import { and, eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import authOptions from "@/auth";
-import { DEMO_MODE } from "@/lib/config/demo";
 import { db } from "@/lib/db";
-import { purchases, transactions, users } from "@/lib/db/schema";
+import { purchases, templates, transactions, users } from "@/lib/db/schema";
 import { generateInvoicePdf } from "@/lib/invoices/generate-invoice";
 
 type Params = {
@@ -12,10 +11,10 @@ type Params = {
 };
 
 export async function GET(_request: NextRequest, { params }: Params) {
-  const session = DEMO_MODE ? null : await getServerSession(authOptions);
+  const session = await getServerSession(authOptions);
   const { transactionId } = await params;
 
-  if (!DEMO_MODE && !session?.user?.email) {
+  if (!session?.user?.email) {
     return NextResponse.json({ ok: false, message: "Unauthorized." }, { status: 401 });
   }
 
@@ -23,22 +22,8 @@ export async function GET(_request: NextRequest, { params }: Params) {
     return NextResponse.json({ ok: false, message: "Missing transaction id." }, { status: 400 });
   }
 
-  if (DEMO_MODE || !db) {
-    const demoPdf = await generateInvoicePdf({
-      transactionId,
-      createdAt: new Date(),
-      bankRef: "DEMO-REF",
-      amountUsd: 49,
-      currency: "USD",
-    });
-    const demoPdfBuffer = Buffer.from(demoPdf);
-
-    return new Response(demoPdfBuffer, {
-      headers: {
-        "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="invoice-${transactionId}.pdf"`,
-      },
-    });
+  if (!db) {
+    return NextResponse.json({ ok: false, message: "Database is not configured." }, { status: 500 });
   }
 
   if (!session?.user?.email) {
@@ -60,6 +45,8 @@ export async function GET(_request: NextRequest, { params }: Params) {
       id: transactions.id,
       amount: transactions.amount,
       bankRef: transactions.bankRef,
+      provider: transactions.provider,
+      userEmail: transactions.userEmail,
       completedAt: transactions.completedAt,
       createdAt: transactions.createdAt,
     })
@@ -77,31 +64,53 @@ export async function GET(_request: NextRequest, { params }: Params) {
     return NextResponse.json({ ok: false, message: "Completed transaction not found." }, { status: 404 });
   }
 
-  const [purchase] = await db
-    .select({ currency: purchases.currency })
+  const purchaseRows = await db
+    .select({
+      currency: purchases.currency,
+      paidAmount: purchases.paidAmount,
+      licenseKey: purchases.licenseKey,
+      templateId: templates.id,
+      templateTitle: templates.title,
+      templateSlug: templates.slug,
+      templateCategory: templates.category,
+    })
     .from(purchases)
+    .innerJoin(templates, eq(templates.id, purchases.templateId))
     .where(
       and(
         eq(purchases.transactionId, transaction.id),
         eq(purchases.userId, linkedUser.id),
         eq(purchases.status, "COMPLETED"),
       ),
-    )
-    .limit(1);
+    );
 
-  if (!purchase) {
+  if (purchaseRows.length === 0) {
     return NextResponse.json({ ok: false, message: "No completed purchase found." }, { status: 404 });
   }
 
   const amountUsd = Number(transaction.amount);
   const invoiceDate = transaction.completedAt ?? transaction.createdAt ?? new Date();
+  const primaryCurrency = purchaseRows[0].currency;
+
+  const lineItems = purchaseRows.map((row) => ({
+    templateId: row.templateId,
+    title: row.templateTitle,
+    slug: row.templateSlug,
+    category: row.templateCategory,
+    licenseKey: row.licenseKey,
+    amountUsd: Number(row.paidAmount),
+    currency: row.currency,
+  }));
 
   const pdfBytes = await generateInvoicePdf({
     transactionId: transaction.id,
     createdAt: new Date(invoiceDate),
     bankRef: transaction.bankRef ?? "Pending",
     amountUsd: Number.isFinite(amountUsd) ? amountUsd : 0,
-    currency: purchase.currency,
+    currency: primaryCurrency,
+    provider: transaction.provider,
+    customerEmail: transaction.userEmail,
+    lineItems,
   });
   const pdfBuffer = Buffer.from(pdfBytes);
 

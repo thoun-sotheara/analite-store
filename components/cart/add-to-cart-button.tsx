@@ -23,7 +23,7 @@ export function AddToCartButton({ templateId, quantity = 1, className }: AddToCa
       onClick={onAdd}
       className={
         className ??
-        `inline-flex items-center justify-center rounded-md border px-3 py-2 transition ${
+        `inline-flex items-center justify-center rounded border px-3 py-2 transition ${
           inCart
             ? "border-slate-400 bg-slate-50 text-slate-700"
             : "border-border text-foreground hover:border-slate-400"

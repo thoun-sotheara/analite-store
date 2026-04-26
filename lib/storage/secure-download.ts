@@ -1,6 +1,5 @@
 import { GetObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { DEMO_MODE } from "@/lib/config/demo";
 
 const region = process.env.AWS_REGION;
 const bucket = process.env.AWS_PRIVATE_BUCKET;
@@ -22,10 +21,6 @@ export async function generateSecureTemplateDownloadUrl({
   transactionId,
 }: GenerateSecureTemplateDownloadUrlInput): Promise<string> {
   if (!s3Client || !bucket) {
-    if (DEMO_MODE) {
-      return `/api/demo/download?tx=${transactionId}`;
-    }
-
     throw new Error("S3 credentials are not configured.");
   }
 

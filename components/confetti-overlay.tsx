@@ -26,11 +26,11 @@ export function ConfettiOverlay() {
   );
 
   return (
-    <div className="pointer-events-none absolute inset-0 overflow-hidden">
+    <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden" aria-hidden="true">
       {particles.map((particle) => (
         <span
           key={particle.id}
-          className="absolute -top-2 h-2 w-2 animate-[confetti_var(--dur)_linear_var(--delay)_forwards] rounded-sm"
+          className="pointer-events-none absolute -top-2 h-2 w-2 animate-[confetti_var(--dur)_linear_var(--delay)_forwards] rounded-sm"
           style={
             {
               left: particle.left,

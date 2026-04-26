@@ -13,6 +13,7 @@ import {
   formatPrice,
   type Currency,
 } from "@/lib/config/currency";
+import { readCookie, setCookie } from "@/lib/web/cookies";
 
 type CurrencyContextValue = {
   currency: Currency;
@@ -28,10 +29,7 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
   const [currency, setCurrencyState] = useState<Currency>(DEFAULT_CURRENCY);
 
   useEffect(() => {
-    const fromCookie = document.cookie
-      .split("; ")
-      .find((item) => item.startsWith(`${COOKIE_NAME}=`))
-      ?.split("=")[1] as Currency | undefined;
+    const fromCookie = readCookie(COOKIE_NAME) as Currency | null;
 
     if (fromCookie === "USD" || fromCookie === "KHR") {
       setCurrencyState(fromCookie);
@@ -43,7 +41,7 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
       currency,
       setCurrency: (nextCurrency: Currency) => {
         setCurrencyState(nextCurrency);
-        document.cookie = `${COOKIE_NAME}=${nextCurrency}; Path=/; Max-Age=2592000; SameSite=Lax`;
+        setCookie(COOKIE_NAME, nextCurrency, 60 * 60 * 24 * 30);
       },
       formatFromUsd: (usdAmount: number) => formatPrice(usdAmount, currency),
     }),

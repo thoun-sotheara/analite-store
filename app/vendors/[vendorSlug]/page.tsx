@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ProductGrid } from "@/components/product/product-grid";
-import { getTemplatesByVendorSlug, getVendorBySlug, mockTemplates } from "@/lib/data/mock-templates";
+import { getVendorBySlugDB, getTemplatesByVendorSlugDB } from "@/lib/db/queries";
 
 type VendorPageProps = {
   params: Promise<{ vendorSlug: string }>;
@@ -11,19 +11,21 @@ type VendorPageProps = {
 export default async function VendorPage({ params, searchParams }: VendorPageProps) {
   const { vendorSlug } = await params;
   const filters = await searchParams;
-  const vendor = getVendorBySlug(vendorSlug);
 
-  if (!vendor) {
-    notFound();
-  }
+  const [dbVendor, dbTemplates] = await Promise.all([
+    getVendorBySlugDB(vendorSlug),
+    getTemplatesByVendorSlugDB(vendorSlug),
+  ]);
 
-  const templates = getTemplatesByVendorSlug(vendorSlug);
+  const vendor = dbVendor;
+  if (!vendor) notFound();
+
+  const templates = dbTemplates;
   const categories = Array.from(new Set(templates.map((template) => template.category)));
   const activeCategory = filters.category;
   const visibleTemplates = activeCategory
     ? templates.filter((template) => template.category === activeCategory)
     : templates;
-  const featuredTemplate = mockTemplates.find((template) => template.vendor.slug === vendorSlug);
   const categoryLabels = Object.fromEntries(templates.map((template) => [template.category, template.categoryLabel]));
 
   return (
@@ -65,8 +67,8 @@ export default async function VendorPage({ params, searchParams }: VendorPagePro
           <div className="mt-4 space-y-3 text-sm text-muted">
             <p>Templates: {templates.length}</p>
             <p>Total Downloads: {templates.reduce((sum, item) => sum + item.downloadCount, 0)}</p>
-            <p>Average Rating: {(templates.reduce((sum, item) => sum + item.rating, 0) / templates.length).toFixed(1)}</p>
-            <p>Featured Stack: {featuredTemplate?.techStack ?? "Mixed"}</p>
+            <p>Average Rating: {templates.length > 0 ? (templates.reduce((sum, item) => sum + item.rating, 0) / templates.length).toFixed(1) : "N/A"}</p>
+            <p>Featured Stack: {templates[0]?.techStack ?? "Mixed"}</p>
           </div>
         </article>
       </section>

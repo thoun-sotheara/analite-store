@@ -20,6 +20,52 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## KHPay Setup
+
+Set these environment variables before running checkout:
+
+```bash
+KHPAY_API_KEY=your_api_key
+KHPAY_BASE_URL=https://api-sandbox.khpay.me/api/v1
+KHPAY_WEBHOOK_SECRET=your_webhook_secret
+NEXT_PUBLIC_SITE_URL=https://analite-kit.vercel.app
+```
+
+Webhook endpoint:
+
+```text
+https://analite-kit.vercel.app/api/payments/webhook
+```
+
+The integration uses webhook-first confirmation with signature validation. Checkout status polling is also enabled as a fallback for resilience.
+
+## Phase 8 Deployment Checklist
+
+Validate required production environment variables:
+
+```bash
+npm run check:env
+```
+
+Use strict mode to enforce optional analytics keys too:
+
+```bash
+node scripts/check-env.mjs --strict
+```
+
+Apply DB migrations (including performance indexes in `drizzle/0002_phase8_indexes.sql`):
+
+```bash
+npx drizzle-kit migrate
+```
+
+Recommended order before production deploy:
+
+1. Pull latest project env vars.
+2. Run `npm run check:env`.
+3. Run `npx drizzle-kit migrate`.
+4. Deploy with `npx vercel --prod`.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:

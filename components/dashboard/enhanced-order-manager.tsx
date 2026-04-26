@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { MoreVertical, RefreshCw, RotateCcw, FileText } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { MoreVertical, RefreshCw, FileText } from "lucide-react";
 
-type OrderStatus = "Completed" | "Pending" | "Refunded" | "Failed";
+type OrderStatus = "Completed" | "Pending";
 
 type OrderItemWithActions = {
   id: string;
@@ -14,65 +15,43 @@ type OrderItemWithActions = {
   status: OrderStatus;
   date: string;
   licenseKey: string;
-  downloadUrl?: string;
+  bankRef: string;
+  itemCount: number;
+  invoiceUrl: string | null;
 };
-
-const orders: OrderItemWithActions[] = [
-  {
-    id: "ORD-1001",
-    buyer: "Demo User",
-    buyerEmail: "demo@analite.store",
-    product: "Khmer Shopfront",
-    amount: 79,
-    status: "Completed",
-    date: "2026-04-23",
-    licenseKey: "KS-2026-0001-DEMO",
-    downloadUrl: "/downloads/khmer-shopfront.zip",
-  },
-  {
-    id: "ORD-1002",
-    buyer: "Borey Craft",
-    buyerEmail: "agency@borey.studio",
-    product: "Phnom Villa Pro",
-    amount: 49,
-    status: "Pending",
-    date: "2026-04-22",
-    licenseKey: "PV-2026-0002-PENDING",
-  },
-  {
-    id: "ORD-1003",
-    buyer: "Ever After",
-    buyerEmail: "events@everafter.kh",
-    product: "Moonlight Invitation",
-    amount: 29,
-    status: "Completed",
-    date: "2026-04-21",
-    licenseKey: "MI-2026-0003-DEMO",
-    downloadUrl: "/downloads/moonlight-invitation.zip",
-  },
-  {
-    id: "ORD-1004",
-    buyer: "Studio Nine",
-    buyerEmail: "creator@studionine.design",
-    product: "Creator Profile One",
-    amount: 39,
-    status: "Refunded",
-    date: "2026-04-20",
-    licenseKey: "CP-2026-0004-REFUNDED",
-  },
-];
 
 const statusColors: Record<OrderStatus, string> = {
   Completed: "text-green-700 bg-green-50 border-green-200",
   Pending: "text-yellow-700 bg-yellow-50 border-yellow-200",
-  Refunded: "text-red-700 bg-red-50 border-red-200",
-  Failed: "text-gray-700 bg-gray-50 border-gray-200",
 };
 
 export function EnhancedOrderManager() {
+  const [orders, setOrders] = useState<OrderItemWithActions[]>([]);
   const [statusFilter, setStatusFilter] = useState<"All" | OrderStatus>("All");
   const [query, setQuery] = useState("");
   const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const fetchOrders = useCallback(async () => {
+    setLoading(true);
+    try {
+      const response = await fetch("/api/dashboard/orders", { cache: "no-store" });
+      if (!response.ok) {
+        setOrders([]);
+        return;
+      }
+
+      setOrders(await response.json());
+    } catch {
+      setOrders([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void fetchOrders();
+  }, [fetchOrders]);
 
   const visibleOrders = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -83,11 +62,7 @@ export function EnhancedOrderManager() {
         `${order.id} ${order.buyer} ${order.product} ${order.buyerEmail}`.toLowerCase().includes(normalizedQuery);
       return statusMatch && queryMatch;
     });
-  }, [query, statusFilter]);
-
-  const handleAction = (orderId: string, action: string) => {
-    console.log(`Action: ${action} on order: ${orderId}`);
-  };
+  }, [orders, query, statusFilter]);
 
   return (
     <section className="mt-8 rounded-2xl border border-border bg-white p-5 sm:p-6">
@@ -96,17 +71,24 @@ export function EnhancedOrderManager() {
           <h2 className="text-lg font-semibold text-foreground">Order Management</h2>
           <p className="mt-1 text-sm text-muted">View, process, and manage customer orders</p>
         </div>
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value as "All" | OrderStatus)}
-          className="rounded-md border border-border px-3 py-2 text-sm outline-none"
-        >
-          <option value="All">All Statuses</option>
-          <option value="Completed">Completed</option>
-          <option value="Pending">Pending</option>
-          <option value="Refunded">Refunded</option>
-          <option value="Failed">Failed</option>
-        </select>
+        <div className="flex items-center gap-2">
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as "All" | OrderStatus)}
+            className="rounded-md border border-border px-3 py-2 text-sm outline-none"
+          >
+            <option value="All">All Statuses</option>
+            <option value="Completed">Completed</option>
+            <option value="Pending">Pending</option>
+          </select>
+          <button
+            type="button"
+            onClick={() => void fetchOrders()}
+            className="inline-flex items-center gap-1 rounded-md border border-border px-3 py-2 text-sm text-foreground transition hover:border-foreground"
+          >
+            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Refresh
+          </button>
+        </div>
       </div>
 
       <input
@@ -118,6 +100,9 @@ export function EnhancedOrderManager() {
       />
 
       <div className="mt-5 space-y-3" data-stagger="true">
+        {loading ? (
+          <p className="text-sm text-muted">Loading orders...</p>
+        ) : null}
         {visibleOrders.map((order) => (
           <div
             key={order.id}
@@ -147,40 +132,30 @@ export function EnhancedOrderManager() {
                     <p className="text-xs text-muted">Order Date</p>
                     <p className="font-medium text-foreground">{order.date}</p>
                     <p className="text-xs text-muted">License: {order.licenseKey}</p>
+                    <p className="text-xs text-muted">Bank Ref: {order.bankRef}</p>
                   </div>
                 </div>
 
                 {expandedOrder === order.id && (
                   <div className="mt-4 space-y-3 border-t border-border pt-4">
                     <div className="text-xs">
-                      <p className="mb-2 font-semibold text-foreground">Order Actions</p>
+                      <p className="mb-2 font-semibold text-foreground">Order Details</p>
                       <div className="flex flex-wrap gap-2">
-                        <button
-                          onClick={() => handleAction(order.id, "resendEmail")}
-                          className="inline-flex items-center gap-1 rounded-md border border-border px-3 py-1 text-xs text-foreground transition hover:border-foreground"
-                        >
-                          <RotateCcw className="h-3 w-3" /> Resend Email
-                        </button>
-                        <button
-                          onClick={() => handleAction(order.id, "regenerateLicense")}
-                          className="inline-flex items-center gap-1 rounded-md border border-border px-3 py-1 text-xs text-foreground transition hover:border-foreground"
-                        >
-                          <RefreshCw className="h-3 w-3" /> Regenerate License
-                        </button>
-                        <button
-                          onClick={() => handleAction(order.id, "generateInvoice")}
-                          className="inline-flex items-center gap-1 rounded-md border border-border px-3 py-1 text-xs text-foreground transition hover:border-foreground"
-                        >
-                          <FileText className="h-3 w-3" /> Generate Invoice
-                        </button>
-                        {order.status === "Completed" && (
-                          <button
-                            onClick={() => handleAction(order.id, "refund")}
-                            className="inline-flex items-center gap-1 rounded-md border border-red-300 bg-red-50 px-3 py-1 text-xs text-red-700 transition hover:border-red-400"
+                        {order.invoiceUrl ? (
+                          <Link
+                            href={order.invoiceUrl}
+                            target="_blank"
+                            className="inline-flex items-center gap-1 rounded-md border border-border px-3 py-1 text-xs text-foreground transition hover:border-foreground"
                           >
-                            <RotateCcw className="h-3 w-3" /> Process Refund
-                          </button>
-                        )}
+                            <FileText className="h-3 w-3" /> Download Invoice
+                          </Link>
+                        ) : null}
+                        <span className="rounded-md border border-border px-3 py-1 text-xs text-muted">
+                          Items: {order.itemCount}
+                        </span>
+                        <span className="rounded-md border border-border px-3 py-1 text-xs text-muted">
+                          Refund and resend automation remain payment-provider tasks.
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -201,7 +176,7 @@ export function EnhancedOrderManager() {
         ))}
       </div>
 
-      {visibleOrders.length === 0 && (
+      {!loading && visibleOrders.length === 0 && (
         <div className="mt-8 text-center">
           <p className="text-sm text-muted">No orders found matching your criteria</p>
         </div>

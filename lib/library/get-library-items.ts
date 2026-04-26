@@ -1,7 +1,6 @@
 import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { mockTemplates } from "@/lib/data/mock-templates";
-import { purchases, transactions, users } from "@/lib/db/schema";
+import { purchases, templates, transactions, users } from "@/lib/db/schema";
 
 export type LibraryItem = {
   templateId: string;
@@ -16,16 +15,7 @@ export type LibraryItem = {
 
 export async function getLibraryItems(userEmail: string): Promise<LibraryItem[]> {
   if (!db) {
-    return mockTemplates.slice(0, 3).map((item, index) => ({
-      templateId: item.id,
-      transactionId: `demo-${item.id}`,
-      title: item.title,
-      thumbnailUrl: item.screenMockupUrl,
-      documentationUrl: item.documentationUrl,
-      s3Key: item.s3Key,
-      bankRef: `DEMO-REF-${index + 1}`,
-      licenseKey: `demo-license-${item.id}`,
-    }));
+    return [];
   }
 
   const [user] = await db
@@ -44,33 +34,30 @@ export async function getLibraryItems(userEmail: string): Promise<LibraryItem[]>
       transactionId: transactions.id,
       bankRef: transactions.bankRef,
       licenseKey: purchases.licenseKey,
+      title: templates.title,
+      s3Key: templates.s3Key,
+      previewUrl: templates.previewUrl,
     })
     .from(purchases)
-    .innerJoin(transactions, and(
-      eq(transactions.id, purchases.transactionId),
-      eq(transactions.userEmail, userEmail),
-      eq(transactions.status, "completed"),
-    ))
+    .innerJoin(
+      transactions,
+      and(
+        eq(transactions.id, purchases.transactionId),
+        eq(transactions.userEmail, userEmail),
+        eq(transactions.status, "completed"),
+      ),
+    )
+    .innerJoin(templates, eq(templates.id, purchases.templateId))
     .where(and(eq(purchases.userId, user.id), eq(purchases.status, "COMPLETED")));
 
-  return completedPurchases
-    .map((purchase) => {
-      const template = mockTemplates.find((item) => item.id === purchase.templateId);
-
-      if (!template) {
-        return null;
-      }
-
-      return {
-        templateId: template.id,
-        transactionId: purchase.transactionId,
-        title: template.title,
-        thumbnailUrl: template.screenMockupUrl,
-        documentationUrl: template.documentationUrl,
-        s3Key: template.s3Key,
-        bankRef: purchase.bankRef ?? "",
-        licenseKey: purchase.licenseKey,
-      };
-    })
-    .filter((item): item is LibraryItem => item !== null);
+  return completedPurchases.map((purchase) => ({
+    templateId: purchase.templateId,
+    transactionId: purchase.transactionId,
+    title: purchase.title,
+    thumbnailUrl: purchase.previewUrl ?? "/placeholder-product.svg",
+    documentationUrl: purchase.previewUrl ?? "",
+    s3Key: purchase.s3Key,
+    bankRef: purchase.bankRef ?? "",
+    licenseKey: purchase.licenseKey,
+  }));
 }

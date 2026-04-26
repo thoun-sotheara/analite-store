@@ -6,7 +6,7 @@ import { useCatalog } from "@/components/catalog/catalog-provider";
 import { RecentlyViewedGrid } from "@/components/wishlist/recently-viewed-grid";
 
 export default function ProductsPage() {
-  const { items } = useCatalog();
+  const { items, isLoading } = useCatalog();
   const { topPriority } = useSmartRecommendations();
 
   return (
@@ -20,7 +20,13 @@ export default function ProductsPage() {
       </p>
 
       <section className="mt-10">
-        <ProductCatalog items={items} priorityItems={topPriority} />
+        {isLoading ? (
+          <div className="rounded-2xl border border-border bg-white px-6 py-10 text-center text-sm text-muted">
+            Loading templates from the marketplace database...
+          </div>
+        ) : (
+          <ProductCatalog items={items} priorityItems={topPriority} />
+        )}
       </section>
 
       <RecentlyViewedGrid />

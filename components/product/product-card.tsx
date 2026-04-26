@@ -1,7 +1,8 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
-import { ArrowUpRight, Download, Monitor, Server, Sparkles, Star } from "lucide-react";
+import { ArrowUpRight, BadgeCheck, Download, Monitor, Server, Sparkles, Star } from "lucide-react";
 import { AddToCartButton } from "@/components/cart/add-to-cart-button";
 import { useCurrency } from "@/components/currency/currency-provider";
 import { WishlistButton } from "@/components/wishlist/wishlist-button";
@@ -16,13 +17,15 @@ export function ProductCard({ item, featured = false }: ProductCardProps) {
   const { formatFromUsd } = useCurrency();
 
   return (
-    <article className="group flex h-full flex-col overflow-hidden rounded-2xl border border-border bg-white transition duration-300 hover:-translate-y-1 hover:shadow-xl">
+    <article className="group flex h-full flex-col overflow-hidden rounded-lg border border-border bg-white transition duration-300 hover:-translate-y-1 hover:shadow-xl">
       <div className="relative aspect-[16/10] w-full overflow-hidden border-b border-border bg-surface">
-        <img
+        <Image
           src={item.screenMockupUrl}
           alt={`${item.title} preview`}
-          className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
-          loading="lazy"
+          fill
+          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+          className="object-cover transition duration-500 group-hover:scale-105"
+          unoptimized
         />
         <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent p-4 text-white">
           <div className="flex items-center justify-between text-xs">
@@ -65,11 +68,11 @@ export function ProductCard({ item, featured = false }: ProductCardProps) {
           </span>
         </div>
 
-        <p className="text-[11px] text-muted">
+        <p className="flex items-center gap-1.5 text-[11px] text-muted">
           <Link href={`/vendors/${item.vendor.slug}`} className="underline decoration-transparent underline-offset-4 transition hover:text-foreground hover:decoration-current">
             {item.vendor.name}
-          </Link>{" "}
-          {item.vendor.verified ? "• Verified" : ""}
+          </Link>
+          {item.vendor.verified ? <BadgeCheck className="h-4 w-4 text-blue-500" /> : null}
         </p>
 
         <div className="rounded-lg border border-border bg-surface/50 p-3 text-[11px] text-muted">
@@ -77,21 +80,20 @@ export function ProductCard({ item, featured = false }: ProductCardProps) {
           <p className="mt-1 truncate">Best for teams building {item.categoryLabel.toLowerCase()} products.</p>
         </div>
 
-        <div className="mt-auto grid grid-cols-[1fr_1fr_auto] gap-2 pt-3">
+        <div className="mt-auto grid grid-cols-3 gap-2 pt-3">
           <Link
             href={`/preview/${item.id}`}
-            className="inline-flex items-center justify-center gap-1 rounded-md border border-border px-3 py-2 text-xs text-foreground transition hover:border-slate-400"
+            className="inline-flex items-center justify-center gap-1 rounded-md border border-border px-2 py-2 text-xs text-foreground transition hover:bg-slate-50"
           >
             <Monitor className="h-3.5 w-3.5" />
-            Live Preview
           </Link>
-          <AddToCartButton templateId={item.id} />
-          <WishlistButton templateId={item.id} iconOnly />
+          <AddToCartButton templateId={item.id} className="inline-flex items-center justify-center rounded-md border border-border px-2 py-2 text-xs text-foreground transition hover:bg-slate-50" />
+          <WishlistButton templateId={item.id} iconOnly className="inline-flex items-center justify-center rounded-md border border-border px-2 py-2 text-xs text-foreground transition hover:bg-slate-50" />
         </div>
 
         <Link
           href={`/products/${item.id}`}
-          className="inline-flex items-center justify-center gap-1 rounded-md bg-foreground px-3 py-2 text-xs text-white transition hover:bg-slate-800"
+          className="mt-2 inline-flex w-full items-center justify-center gap-1 rounded-md bg-foreground px-3 py-2 text-xs font-medium text-white transition hover:bg-slate-800"
         >
           View Product
           <ArrowUpRight className="h-3.5 w-3.5" />
