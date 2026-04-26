@@ -48,12 +48,46 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
   const [dbItems, setDbItems] = useState<TemplateItem[] | null>(null);
 
   useEffect(() => {
-    fetch("/api/catalog")
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data: { items: TemplateItem[] } | null) => {
-        setDbItems(Array.isArray(data?.items) ? data!.items : []);
-      })
-      .catch(() => { setDbItems([]); });
+    let active = true;
+
+    const fetchCatalog = () => {
+      fetch("/api/catalog", { cache: "no-store" })
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data: { items?: TemplateItem[] } | null) => {
+          if (!active) return;
+          if (Array.isArray(data?.items)) {
+            setDbItems(data.items);
+            return;
+          }
+          setDbItems((prev) => prev ?? []);
+        })
+        .catch(() => {
+          if (!active) return;
+          // Keep last known list on transient network/API errors.
+          setDbItems((prev) => prev ?? []);
+        });
+    };
+
+    fetchCatalog();
+
+    // Near real-time sync for view/download counters and newly added templates.
+    const interval = window.setInterval(fetchCatalog, 10_000);
+    const onFocus = () => fetchCatalog();
+    const onVisible = () => {
+      if (document.visibilityState === "visible") {
+        fetchCatalog();
+      }
+    };
+
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisible);
+
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, []);
 
   const items = useMemo(() => dbItems ?? [], [dbItems]);
