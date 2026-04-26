@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { getServerSession } from "next-auth";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import authOptions from "@/auth";
 import { db } from "@/lib/db";
@@ -108,53 +108,100 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Slug already in use" }, { status: 409 });
     }
 
+    const normalizedCategory = ["real-estate", "portfolio", "e-commerce", "wedding"].includes(data.category)
+      ? data.category
+      : "e-commerce";
+
     let newTemplate: { id: string } | undefined;
 
+    function pickInsertedId(result: unknown): { id: string } | undefined {
+      if (Array.isArray(result)) {
+        return result[0] as { id: string } | undefined;
+      }
+      if (
+        typeof result === "object" &&
+        result !== null &&
+        "rows" in result &&
+        Array.isArray((result as { rows: unknown[] }).rows)
+      ) {
+        return (result as { rows: { id: string }[] }).rows[0];
+      }
+      return undefined;
+    }
+
     try {
-      [newTemplate] = await db
-        .insert(templates)
-        .values({
-          title: data.title,
-          description: data.description ?? null,
-          priceUsd: data.priceUsd,
-          s3Key: data.s3Key,
-          previewUrl: data.previewUrl || null,
-          screenMockupUrl: data.screenMockupUrl || null,
-          galleryImage1: data.galleryImage1 || null,
-          galleryImage2: data.galleryImage2 || null,
-          galleryImage3: data.galleryImage3 || null,
-          galleryImage4: data.galleryImage4 || null,
-          documentationUrl: data.documentationUrl || null,
-          slug: data.slug,
-          techStack: data.techStack ?? null,
-          category: data.category,
-          categoryId: data.categoryId ?? null,
-          vendorId: data.vendorId ?? null,
-          isActive: data.isActive,
-        })
-        .returning({ id: templates.id });
+      const fullInsertResult = await db.execute(sql`
+        insert into "templates" (
+          "title",
+          "description",
+          "price_usd",
+          "s3_key",
+          "preview_url",
+          "category_id",
+          "vendor_id",
+          "category",
+          "slug",
+          "tech_stack",
+          "screen_mockup_url",
+          "gallery_image_1",
+          "gallery_image_2",
+          "gallery_image_3",
+          "gallery_image_4",
+          "documentation_url",
+          "is_active"
+        ) values (
+          ${data.title},
+          ${data.description ?? null},
+          ${data.priceUsd},
+          ${data.s3Key},
+          ${data.previewUrl || null},
+          ${data.categoryId ?? null},
+          ${data.vendorId ?? null},
+          ${normalizedCategory},
+          ${data.slug},
+          ${data.techStack ?? null},
+          ${data.screenMockupUrl || null},
+          ${data.galleryImage1 || null},
+          ${data.galleryImage2 || null},
+          ${data.galleryImage3 || null},
+          ${data.galleryImage4 || null},
+          ${data.documentationUrl || null},
+          ${data.isActive}
+        )
+        returning "id"
+      `);
+      newTemplate = pickInsertedId(fullInsertResult);
     } catch {
       // Fallback for older production schemas that do not yet have newer optional columns.
-      const legacyCategory = ["real-estate", "portfolio", "e-commerce", "wedding"].includes(data.category)
-        ? data.category
-        : "e-commerce";
-
-      [newTemplate] = await db
-        .insert(templates)
-        .values({
-          title: data.title,
-          description: data.description ?? null,
-          priceUsd: data.priceUsd,
-          s3Key: data.s3Key,
-          previewUrl: data.previewUrl || null,
-          screenMockupUrl: data.screenMockupUrl || null,
-          documentationUrl: data.documentationUrl || null,
-          slug: data.slug,
-          techStack: data.techStack ?? null,
-          category: legacyCategory,
-          isActive: data.isActive,
-        })
-        .returning({ id: templates.id });
+      const legacyInsertResult = await db.execute(sql`
+        insert into "templates" (
+          "title",
+          "description",
+          "price_usd",
+          "s3_key",
+          "preview_url",
+          "category",
+          "slug",
+          "tech_stack",
+          "screen_mockup_url",
+          "documentation_url",
+          "is_active"
+        ) values (
+          ${data.title},
+          ${data.description ?? null},
+          ${data.priceUsd},
+          ${data.s3Key},
+          ${data.previewUrl || null},
+          ${normalizedCategory},
+          ${data.slug},
+          ${data.techStack ?? null},
+          ${data.screenMockupUrl || null},
+          ${data.documentationUrl || null},
+          ${data.isActive}
+        )
+        returning "id"
+      `);
+      newTemplate = pickInsertedId(legacyInsertResult);
     }
 
     // Purge Next.js cached pages so the new product is visible immediately.
