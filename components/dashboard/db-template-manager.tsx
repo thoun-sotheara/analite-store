@@ -406,7 +406,7 @@ export function DbTemplateManager() {
                 required
                 value={form.slug}
                 onChange={(e) => setForm((f) => ({ ...f, slug: e.target.value }))}
-                pattern="[-a-z0-9]+"
+                pattern="[a-z0-9]+(?:-[a-z0-9]+)*"
                 placeholder="modern-real-estate-pro"
                 className={`w-full rounded-md border px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-400 ${formErrors.slug ? "border-red-400 bg-red-50" : "border-border"}`}
               />
@@ -768,7 +768,7 @@ export function CategoryManager() {
             </div>
             <div>
               <label className="block text-xs font-medium text-foreground mb-1">Slug * (auto)</label>
-              <input required value={form.slug} onChange={(e) => setForm((f) => ({ ...f, slug: e.target.value }))} pattern="[-a-z0-9]+" placeholder="saas" className="w-full rounded-md border border-border px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-400" />
+              <input required value={form.slug} onChange={(e) => setForm((f) => ({ ...f, slug: e.target.value }))} pattern="[a-z0-9]+(?:-[a-z0-9]+)*" placeholder="saas" className="w-full rounded-md border border-border px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-400" />
             </div>
             <div>
               <label className="block text-xs font-medium text-foreground mb-1">Icon slug (Lucide name)</label>

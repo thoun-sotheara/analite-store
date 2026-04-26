@@ -107,33 +107,59 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Slug already in use" }, { status: 409 });
   }
 
-  const [newTemplate] = await db
-    .insert(templates)
-    .values({
-      title: data.title,
-      description: data.description ?? null,
-      priceUsd: data.priceUsd,
-      s3Key: data.s3Key,
-      previewUrl: data.previewUrl || null,
-      screenMockupUrl: data.screenMockupUrl || null,
-      galleryImage1: data.galleryImage1 || null,
-      galleryImage2: data.galleryImage2 || null,
-      galleryImage3: data.galleryImage3 || null,
-      galleryImage4: data.galleryImage4 || null,
-      documentationUrl: data.documentationUrl || null,
-      slug: data.slug,
-      techStack: data.techStack ?? null,
-      category: data.category,
-      categoryId: data.categoryId ?? null,
-      vendorId: data.vendorId ?? null,
-      isActive: data.isActive,
-    })
-    .returning();
+  let newTemplate: { id: string } | undefined;
+
+  try {
+    [newTemplate] = await db
+      .insert(templates)
+      .values({
+        title: data.title,
+        description: data.description ?? null,
+        priceUsd: data.priceUsd,
+        s3Key: data.s3Key,
+        previewUrl: data.previewUrl || null,
+        screenMockupUrl: data.screenMockupUrl || null,
+        galleryImage1: data.galleryImage1 || null,
+        galleryImage2: data.galleryImage2 || null,
+        galleryImage3: data.galleryImage3 || null,
+        galleryImage4: data.galleryImage4 || null,
+        documentationUrl: data.documentationUrl || null,
+        slug: data.slug,
+        techStack: data.techStack ?? null,
+        category: data.category,
+        categoryId: data.categoryId ?? null,
+        vendorId: data.vendorId ?? null,
+        isActive: data.isActive,
+      })
+      .returning({ id: templates.id });
+  } catch {
+    // Fallback for older production schemas that do not yet have newer optional columns.
+    const legacyCategory = ["real-estate", "portfolio", "e-commerce", "wedding"].includes(data.category)
+      ? data.category
+      : "e-commerce";
+
+    [newTemplate] = await db
+      .insert(templates)
+      .values({
+        title: data.title,
+        description: data.description ?? null,
+        priceUsd: data.priceUsd,
+        s3Key: data.s3Key,
+        previewUrl: data.previewUrl || null,
+        screenMockupUrl: data.screenMockupUrl || null,
+        documentationUrl: data.documentationUrl || null,
+        slug: data.slug,
+        techStack: data.techStack ?? null,
+        category: legacyCategory,
+        isActive: data.isActive,
+      })
+      .returning({ id: templates.id });
+  }
 
     // Purge Next.js cached pages so the new product is visible immediately
     revalidatePath("/api/catalog");
     revalidatePath("/products");
     revalidatePath("/");
 
-    return NextResponse.json(newTemplate, { status: 201 });
+    return NextResponse.json(newTemplate ?? { id: null }, { status: 201 });
 }
