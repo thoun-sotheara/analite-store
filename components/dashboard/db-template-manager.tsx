@@ -3,6 +3,35 @@
 import { useCallback, useEffect, useState } from "react";
 import { Package, Plus, Loader2, Check, X, Tag } from "lucide-react";
 
+// Compress an image file client-side using Canvas to avoid 413 errors on upload.
+async function compressImage(file: File, maxWidth = 1400, quality = 0.82): Promise<File> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    const objectUrl = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      const scale = Math.min(1, maxWidth / img.width);
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      const ctx = canvas.getContext("2d");
+      if (!ctx) { resolve(file); return; }
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) { resolve(file); return; }
+          const outName = file.name.replace(/\.[^.]+$/, ".jpg");
+          resolve(new File([blob], outName, { type: "image/jpeg" }));
+        },
+        "image/jpeg",
+        quality,
+      );
+    };
+    img.onerror = () => { URL.revokeObjectURL(objectUrl); resolve(file); };
+    img.src = objectUrl;
+  });
+}
+
 type Vendor = {
   id: string;
   email: string;
@@ -207,6 +236,12 @@ export function DbTemplateManager() {
     setFormErrors({});
 
     try {
+      // Compress images client-side before uploading to stay under Vercel's 4.5 MB body limit
+      const [compressedImage, ...compressedGallery] = await Promise.all([
+        compressImage(imageFile),
+        ...galleryFiles.map((f) => (f ? compressImage(f) : Promise.resolve(null))),
+      ]);
+
       const payload = new FormData();
       payload.set("title", form.title);
       payload.set("description", form.description || "");
@@ -220,10 +255,10 @@ export function DbTemplateManager() {
       payload.set("vendorId", form.vendorId || "");
       payload.set("isActive", String(form.isActive));
       payload.set("zipFile", zipFile);
-      payload.set("imageFile", imageFile);
-      
-      // Add gallery images
-      galleryFiles.forEach((file, index) => {
+      payload.set("imageFile", compressedImage);
+
+      // Add compressed gallery images
+      compressedGallery.forEach((file, index) => {
         if (file) {
           payload.set(`galleryImage${index + 1}`, file);
         }
