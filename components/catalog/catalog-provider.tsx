@@ -44,6 +44,48 @@ function normalizeSlug(value: string) {
     .slice(0, 64);
 }
 
+function toNumber(value: unknown, fallback = 0) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function normalizeItem(item: Partial<TemplateItem>): TemplateItem {
+  const id = (typeof item.id === "string" && item.id.trim()) || "";
+  const title = (typeof item.title === "string" && item.title.trim()) || "Untitled template";
+  const category = (typeof item.category === "string" && item.category.trim()) || "general";
+
+  return {
+    id,
+    slug: (typeof item.slug === "string" && item.slug.trim()) || id,
+    title,
+    description: (typeof item.description === "string" && item.description) || "",
+    category,
+    categoryLabel: (typeof item.categoryLabel === "string" && item.categoryLabel) || categoryLabel(category),
+    priceUsd: toNumber(item.priceUsd),
+    s3Key: (typeof item.s3Key === "string" && item.s3Key) || "",
+    previewUrl: (typeof item.previewUrl === "string" && item.previewUrl) || "",
+    documentationUrl: (typeof item.documentationUrl === "string" && item.documentationUrl) || "",
+    rating: toNumber(item.rating),
+    reviewCount: toNumber(item.reviewCount),
+    downloadCount: toNumber(item.downloadCount),
+    viewCount: toNumber(item.viewCount),
+    techStack: (typeof item.techStack === "string" && item.techStack) || "Next.js",
+    updatedLabel: (typeof item.updatedLabel === "string" && item.updatedLabel) || "Recently updated",
+    screenMockupUrl: (typeof item.screenMockupUrl === "string" && item.screenMockupUrl) || "/placeholder-product.svg",
+    galleryImage1: item.galleryImage1 ?? null,
+    galleryImage2: item.galleryImage2 ?? null,
+    galleryImage3: item.galleryImage3 ?? null,
+    galleryImage4: item.galleryImage4 ?? null,
+    vendor: {
+      slug: (typeof item.vendor?.slug === "string" && item.vendor.slug) || "analite",
+      name: (typeof item.vendor?.name === "string" && item.vendor.name) || "Analite Studio",
+      verified: Boolean(item.vendor?.verified),
+      bio: (typeof item.vendor?.bio === "string" && item.vendor.bio) || "",
+      location: (typeof item.vendor?.location === "string" && item.vendor.location) || "Cambodia",
+    },
+  };
+}
+
 export function CatalogProvider({ children }: { children: React.ReactNode }) {
   const [dbItems, setDbItems] = useState<TemplateItem[] | null>(null);
 
@@ -56,7 +98,11 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
         .then((data: { items?: TemplateItem[] } | null) => {
           if (!active) return;
           if (Array.isArray(data?.items)) {
-            setDbItems(data.items);
+            setDbItems(
+              data.items
+                .map((item) => normalizeItem(item))
+                .filter((item) => item.id.length > 0),
+            );
             return;
           }
           setDbItems((prev) => prev ?? []);

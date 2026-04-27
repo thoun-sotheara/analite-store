@@ -13,8 +13,14 @@ type ProductCardProps = {
   featured?: boolean;
 };
 
+function formatCount(value: unknown): string {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed.toLocaleString() : "0";
+}
+
 export function ProductCard({ item, featured = false }: ProductCardProps) {
   const { formatFromUsd } = useCurrency();
+  const hasRating = item.reviewCount > 0 && item.rating > 0;
 
   return (
     <article className="group flex h-full flex-col overflow-hidden rounded-lg border border-border bg-white transition duration-300 hover:-translate-y-1 hover:shadow-xl">
@@ -56,15 +62,15 @@ export function ProductCard({ item, featured = false }: ProductCardProps) {
         <div className="grid grid-cols-2 gap-2 text-[11px] text-muted sm:grid-cols-3 sm:gap-3">
           <span className="inline-flex items-center gap-1.5 rounded border border-border px-2 py-1">
             <Download className="h-3 w-3" />
-            {item.downloadCount.toLocaleString()}
+            {formatCount(item.downloadCount)}
           </span>
           <span className="inline-flex items-center gap-1.5 rounded border border-border px-2 py-1">
             <Eye className="h-3 w-3" />
-            {item.viewCount.toLocaleString()}
+            {formatCount(item.viewCount)}
           </span>
           <span className="inline-flex items-center gap-1.5 rounded border border-border px-2 py-1">
             <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
-            {item.rating.toFixed(1)}
+            {hasRating ? item.rating.toFixed(1) : "No rating"}
           </span>
         </div>
 
@@ -85,7 +91,7 @@ export function ProductCard({ item, featured = false }: ProductCardProps) {
         </p>
 
         <div className="rounded-lg border border-border bg-surface/50 p-3 text-[11px] text-muted">
-          <p>{item.reviewCount} reviews • {item.updatedLabel}</p>
+          <p>{item.reviewCount > 0 ? `${item.reviewCount} reviews` : "No reviews yet"} • {item.updatedLabel}</p>
           <p className="mt-1 truncate">Best for teams building {item.categoryLabel.toLowerCase()} products.</p>
         </div>
 

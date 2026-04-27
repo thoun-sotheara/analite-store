@@ -29,9 +29,10 @@ export default async function LibraryPage() {
       <section className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3 lg:[grid-auto-rows:1fr]">
         {items.map((item) => {
           const action = createDownloadLinkAction.bind(null, item.transactionId, item.templateId);
+          const itemKey = `${item.transactionId}:${item.templateId}:${item.licenseKey}`;
 
           return (
-            <article key={item.transactionId} className="flex h-full flex-col rounded-lg border border-border bg-white">
+            <article key={itemKey} className="flex h-full flex-col rounded-lg border border-border bg-white">
               <div className="relative aspect-video overflow-hidden rounded-t-lg border-b border-border bg-surface">
                 <Image
                   src={item.thumbnailUrl}
@@ -52,6 +53,12 @@ export default async function LibraryPage() {
                 <div className="mt-auto pt-4">
                   <DownloadButton action={action} />
                   <div className="mt-3 flex flex-wrap gap-2">
+                    <Link
+                      href={`/products/${item.templateId}#reviews`}
+                      className="inline-flex rounded-md border border-border px-4 py-2 text-sm text-muted transition hover:border-slate-400 hover:text-foreground"
+                    >
+                      Leave Review
+                    </Link>
                     <Link
                       href={`/api/invoice/${item.transactionId}`}
                       target="_blank"

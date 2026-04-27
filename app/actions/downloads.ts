@@ -39,12 +39,12 @@ export async function createDownloadLinkAction(
 
     const session = await getServerSession(authOptions);
     const cookieStore = await cookies();
-    const sessionId =
+    const cookieSessionId =
       cookieStore.get("authjs.session-token")?.value ??
       cookieStore.get("__Secure-authjs.session-token")?.value ??
       "";
 
-    if (!session?.user?.email || !sessionId) {
+    if (!session?.user?.email) {
       return {
         ok: false,
         url: "",
@@ -110,6 +110,12 @@ export async function createDownloadLinkAction(
         message: "No completed purchase is linked to this account.",
       };
     }
+
+    // Some environments use session strategies without exposing authjs cookie tokens.
+    // Fall back to a deterministic fingerprint so authenticated users can still download.
+    const sessionId = cookieSessionId || createHash("sha256")
+      .update(`${session.user.email}:${transactionId}:${dbTemplateId}`)
+      .digest("hex");
 
     const url = await generateSecureTemplateDownloadUrl({
       s3Key: purchase.s3Key,

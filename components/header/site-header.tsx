@@ -14,11 +14,12 @@ export function SiteHeader() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [profileAvatar, setProfileAvatar] = useState("");
+  const [profileDisplayName, setProfileDisplayName] = useState("");
   const userMenuRef = useRef<HTMLDivElement | null>(null);
   const { data: session, status } = useSession();
   const userEmail = session?.user?.email ?? "";
   const userImage = session?.user?.image ?? "";
-  const userName = session?.user?.name ?? userEmail;
+  const sessionUserName = session?.user?.name ?? userEmail;
   const isSessionLoading = status === "loading";
 
   const isSignedIn = status === "authenticated" && Boolean(userEmail);
@@ -37,21 +38,41 @@ export function SiteHeader() {
   useEffect(() => {
     if (!userEmail) {
       setProfileAvatar("");
+      setProfileDisplayName("");
       return;
     }
 
-    const key = `analite_profile_${userEmail.toLowerCase()}`;
-    try {
-      const raw = window.localStorage.getItem(key);
-      if (!raw) {
-        setProfileAvatar("");
+    let active = true;
+
+    const applyProfile = (profile?: { avatarUrl?: string; displayName?: string }) => {
+      if (!active) {
         return;
       }
-      const parsed = JSON.parse(raw) as { avatarUrl?: string };
-      setProfileAvatar(parsed.avatarUrl ?? "");
-    } catch {
-      setProfileAvatar("");
-    }
+
+      setProfileAvatar(profile?.avatarUrl ?? "");
+      setProfileDisplayName(profile?.displayName ?? "");
+    };
+
+    void fetch("/api/profile", { cache: "no-store" })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((profile: { avatarUrl?: string; displayName?: string } | null) => {
+        applyProfile(profile ?? undefined);
+      })
+      .catch(() => {
+        applyProfile(undefined);
+      });
+
+    const handleProfileUpdated = (event: Event) => {
+      const customEvent = event as CustomEvent<{ avatarUrl?: string; displayName?: string }>;
+      applyProfile(customEvent.detail);
+    };
+
+    window.addEventListener("analite-profile-updated", handleProfileUpdated as EventListener);
+
+    return () => {
+      active = false;
+      window.removeEventListener("analite-profile-updated", handleProfileUpdated as EventListener);
+    };
   }, [userEmail]);
 
   useEffect(() => {
@@ -81,6 +102,7 @@ export function SiteHeader() {
     };
   }, [userMenuOpen]);
 
+  const userName = profileDisplayName || sessionUserName;
   const avatarFallback = (userName || userEmail || "U").trim().charAt(0).toUpperCase();
   const avatarSource = profileAvatar || userImage;
 

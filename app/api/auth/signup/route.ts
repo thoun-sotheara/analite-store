@@ -35,8 +35,59 @@ export async function POST(request: NextRequest) {
   }
 
   const email = payload.email.trim().toLowerCase();
-  const role = resolveRoleFromEmail(email);
+  const role = resolveRoleFromEmail(email, process.env.ADMIN_EMAIL);
   const displayName = payload.name?.trim() || email.split("@")[0];
+
+  const [existingCredential] = await db
+    .select({ emailVerifiedAt: authCredentials.emailVerifiedAt })
+    .from(authCredentials)
+    .where(eq(authCredentials.userEmail, email))
+    .limit(1);
+
+  if (existingCredential?.emailVerifiedAt) {
+    return NextResponse.json(
+      { ok: false, message: "An account with this email already exists. Please sign in." },
+      { status: 409 },
+    );
+  }
+
+  if (existingCredential && !existingCredential.emailVerifiedAt) {
+    await db.delete(emailVerificationTokens).where(eq(emailVerificationTokens.userEmail, email));
+
+    const rawToken = randomBytes(32).toString("hex");
+    const tokenHash = hashVerificationToken(rawToken);
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+    await db.insert(emailVerificationTokens).values({
+      id: randomUUID(),
+      userEmail: email,
+      tokenHash,
+      expiresAt,
+    });
+
+    const publicBaseUrl = process.env.NEXTAUTH_URL ?? new URL(request.url).origin;
+    const verificationUrl = `${publicBaseUrl}/api/auth/verify-email?email=${encodeURIComponent(email)}&token=${encodeURIComponent(rawToken)}`;
+
+    const sent = await sendVerificationEmail({
+      to: email,
+      verificationUrl,
+    });
+
+    if (!sent) {
+      return NextResponse.json(
+        {
+          ok: false,
+          message: "Email verification is pending, but email service is not configured. Please set EMAIL_SERVER_* and EMAIL_FROM.",
+        },
+        { status: 500 },
+      );
+    }
+
+    return NextResponse.json({
+      ok: true,
+      message: "Account exists but is not verified yet. A new verification email has been sent.",
+    });
+  }
 
   const passwordHash = hashPassword(payload.password);
 
@@ -47,13 +98,7 @@ export async function POST(request: NextRequest) {
       name: displayName,
       role,
     })
-    .onConflictDoUpdate({
-      target: users.email,
-      set: {
-        name: displayName,
-        role,
-      },
-    });
+    .onConflictDoNothing();
 
   await db
     .insert(authCredentials)

@@ -322,7 +322,7 @@ export function DbTemplateManager() {
   }
 
   return (
-    <section className="mt-8 rounded-2xl border border-border bg-white p-5 sm:p-6">
+    <section id="template-manager" className="mt-8 rounded-2xl border border-border bg-white p-5 sm:p-6 scroll-mt-24">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h3 className="flex items-center gap-2 text-lg font-semibold text-foreground">
@@ -734,7 +734,7 @@ export function CategoryManager() {
   }
 
   return (
-    <section className="mt-8 rounded-2xl border border-border bg-white p-5 sm:p-6">
+    <section id="category-manager" className="mt-8 rounded-2xl border border-border bg-white p-5 sm:p-6 scroll-mt-24">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h3 className="flex items-center gap-2 text-lg font-semibold text-foreground">

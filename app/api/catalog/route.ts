@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { templates } from "@/lib/db/schema";
+import { reviews, templates, users } from "@/lib/db/schema";
 import { getAllTemplates, getAllCategories } from "@/lib/db/queries";
 
 // Public catalog — no auth required
@@ -41,18 +42,83 @@ export async function GET() {
             screenMockupUrl: templates.screenMockupUrl,
             downloadCount: templates.downloadCount,
             viewCount: templates.viewCount,
+            vendorId: templates.vendorId,
             isActive: templates.isActive,
           })
           .from(templates);
 
-        const safeItems = rows
-          .filter((row) => row.isActive)
+        const activeRows = rows.filter((row) => row.isActive);
+        const activeTemplateIds = activeRows.map((row) => row.id);
+        const activeVendorIds = Array.from(new Set(activeRows.map((row) => row.vendorId).filter(Boolean))) as string[];
+
+        const vendorRows = activeVendorIds.length
+          ? await db
+              .select({
+                id: users.id,
+                slug: users.slug,
+                name: users.name,
+                isVendorVerified: users.isVendorVerified,
+              })
+              .from(users)
+              .where(inArray(users.id, activeVendorIds))
+          : [];
+
+        const vendorById = new Map(vendorRows.map((row) => [row.id, row]));
+
+        const categoryLabels = new Map<string, string>();
+        for (const row of activeRows) {
+          if (!categoryLabels.has(row.category)) {
+            categoryLabels.set(
+              row.category,
+              row.category
+                .split("-")
+                .filter(Boolean)
+                .map((word) => word[0]?.toUpperCase() + word.slice(1))
+                .join(" "),
+            );
+          }
+        }
+
+        const fallbackCategories = Array.from(categoryLabels.entries()).map(([slug, title], index) => ({
+          id: slug,
+          slug,
+          title,
+          description: null,
+          iconSlug: null,
+          displayOrder: index,
+        }));
+
+        const reviewMetrics = activeTemplateIds.length
+          ? await db
+              .select({
+                templateId: reviews.templateId,
+                avgRating: sql<string>`coalesce(avg(((${reviews.rating})::text)::int), 0)`,
+                reviewCount: sql<string>`count(*)`,
+              })
+              .from(reviews)
+              .where(and(inArray(reviews.templateId, activeTemplateIds), eq(reviews.isVisible, true)))
+              .groupBy(reviews.templateId)
+          : [];
+
+        const reviewMap = new Map(
+          reviewMetrics.map((row) => [
+            row.templateId,
+            {
+              rating: Number(row.avgRating ?? 0),
+              reviewCount: Number(row.reviewCount ?? 0),
+            },
+          ]),
+        );
+
+        const safeItems = activeRows
           .map((row) => {
             const categoryLabel = row.category
               .split("-")
               .filter(Boolean)
               .map((word) => word[0]?.toUpperCase() + word.slice(1))
               .join(" ");
+            const metric = reviewMap.get(row.id);
+            const vendor = row.vendorId ? vendorById.get(row.vendorId) : undefined;
 
             return {
               id: row.id,
@@ -65,9 +131,10 @@ export async function GET() {
               s3Key: row.s3Key,
               previewUrl: row.previewUrl ?? "",
               documentationUrl: row.documentationUrl ?? "",
-              rating: 0,
-              reviewCount: 0,
+              rating: metric?.rating ?? 0,
+              reviewCount: metric?.reviewCount ?? 0,
               downloadCount: Number(row.downloadCount ?? 0),
+              viewCount: Number(row.viewCount ?? 0),
               techStack: row.techStack ?? "Next.js",
               updatedLabel: "Recently updated",
               screenMockupUrl: row.screenMockupUrl ?? "/placeholder-product.svg",
@@ -76,9 +143,9 @@ export async function GET() {
               galleryImage3: null,
               galleryImage4: null,
               vendor: {
-                slug: "analite",
-                name: "Analite Studio",
-                verified: false,
+                slug: vendor?.slug ?? "vendor",
+                name: vendor?.name ?? "Marketplace Vendor",
+                verified: Boolean(vendor?.isVendorVerified),
                 bio: "",
                 location: "Cambodia",
               },
@@ -88,7 +155,7 @@ export async function GET() {
         return NextResponse.json(
           {
             items: safeItems,
-            categories: [],
+            categories: fallbackCategories,
             degraded: true,
             error: "Catalog fallback mode",
             details: error instanceof Error ? error.message : "Unknown error",

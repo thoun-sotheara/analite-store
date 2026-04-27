@@ -1,7 +1,7 @@
 "use client";
 
 import { Settings, Lock, Bell, CreditCard, Globe, Shield } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 type SettingCategory = {
   id: string;
@@ -58,9 +58,61 @@ const notificationSettings = [
   { name: "System Updates", enabled: true },
 ];
 
+type SettingsState = {
+  storeName: string;
+  timezone: string;
+  paymentProvider: string;
+  bankAccountName: string;
+  language: string;
+  currency: string;
+  region: string;
+  twoFactorEnabled: boolean;
+  allowVendorSelfSignup: boolean;
+  defaultRole: "customer" | "vendor";
+};
+
+const defaultSettingsState: SettingsState = {
+  storeName: "Analite",
+  timezone: "Asia/Phnom_Penh",
+  paymentProvider: "ABA PayWay",
+  bankAccountName: "Analite Marketplace",
+  language: "en",
+  currency: "USD",
+  region: "Cambodia",
+  twoFactorEnabled: false,
+  allowVendorSelfSignup: false,
+  defaultRole: "customer",
+};
+
 export function SystemSettings() {
   const [activeCategory, setActiveCategory] = useState("general");
   const [notifications, setNotifications] = useState(notificationSettings);
+  const [settingsState, setSettingsState] = useState<SettingsState>(defaultSettingsState);
+  const [statusMessage, setStatusMessage] = useState("");
+
+  useEffect(() => {
+    const rawSettings = window.localStorage.getItem("analite_dashboard_settings");
+    if (rawSettings) {
+      try {
+        const parsed = JSON.parse(rawSettings) as Partial<SettingsState>;
+        setSettingsState((current) => ({ ...current, ...parsed }));
+      } catch {
+        setSettingsState(defaultSettingsState);
+      }
+    }
+
+    const rawNotifications = window.localStorage.getItem("analite_dashboard_notifications");
+    if (rawNotifications) {
+      try {
+        const parsed = JSON.parse(rawNotifications) as Array<{ name: string; enabled: boolean }>;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setNotifications(parsed);
+        }
+      } catch {
+        setNotifications(notificationSettings);
+      }
+    }
+  }, []);
 
   const handleToggle = (index: number) => {
     const updated = [...notifications];
@@ -68,8 +120,18 @@ export function SystemSettings() {
     setNotifications(updated);
   };
 
+  function saveSettings(scope: "settings" | "notifications") {
+    if (scope === "settings") {
+      window.localStorage.setItem("analite_dashboard_settings", JSON.stringify(settingsState));
+    } else {
+      window.localStorage.setItem("analite_dashboard_notifications", JSON.stringify(notifications));
+    }
+
+    setStatusMessage("Configuration saved successfully.");
+  }
+
   return (
-    <div className="mt-8 rounded-2xl border border-border bg-white p-5 sm:p-6">
+    <div id="system-settings" className="mt-8 rounded-2xl border border-border bg-white p-5 sm:p-6 scroll-mt-24">
       <h3 className="flex items-center gap-2 text-lg font-semibold text-foreground">
         <Settings className="h-5 w-5" /> System Settings & Configuration
       </h3>
@@ -110,20 +172,62 @@ export function SystemSettings() {
                 <label className="block text-sm font-medium text-foreground">Store Name</label>
                 <input
                   type="text"
-                  defaultValue="Analite"
+                  value={settingsState.storeName}
+                  onChange={(event) => setSettingsState((current) => ({ ...current, storeName: event.target.value }))}
                   className="mt-2 w-full rounded-lg border border-border px-3 py-2 text-sm outline-none"
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-foreground">Timezone</label>
-                <select className="mt-2 w-full rounded-lg border border-border px-3 py-2 text-sm outline-none">
-                  <option>Asia/Phnom_Penh (GMT+7)</option>
-                  <option>Asia/Bangkok (GMT+7)</option>
-                  <option>UTC</option>
+                <select
+                  value={settingsState.timezone}
+                  onChange={(event) => setSettingsState((current) => ({ ...current, timezone: event.target.value }))}
+                  className="mt-2 w-full rounded-lg border border-border px-3 py-2 text-sm outline-none"
+                >
+                  <option value="Asia/Phnom_Penh">Asia/Phnom_Penh (GMT+7)</option>
+                  <option value="Asia/Bangkok">Asia/Bangkok (GMT+7)</option>
+                  <option value="UTC">UTC</option>
                 </select>
               </div>
-              <button className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800">
+              <button
+                type="button"
+                onClick={() => saveSettings("settings")}
+                className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800"
+              >
                 Save Changes
+              </button>
+            </div>
+          )}
+
+          {activeCategory === "payment" && (
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-foreground">Primary Payment Provider</label>
+                <select
+                  value={settingsState.paymentProvider}
+                  onChange={(event) => setSettingsState((current) => ({ ...current, paymentProvider: event.target.value }))}
+                  className="mt-2 w-full rounded-lg border border-border px-3 py-2 text-sm outline-none"
+                >
+                  <option>ABA PayWay</option>
+                  <option>Bakong KHQR</option>
+                  <option>Manual Transfer</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground">Settlement Account Name</label>
+                <input
+                  type="text"
+                  value={settingsState.bankAccountName}
+                  onChange={(event) => setSettingsState((current) => ({ ...current, bankAccountName: event.target.value }))}
+                  className="mt-2 w-full rounded-lg border border-border px-3 py-2 text-sm outline-none"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => saveSettings("settings")}
+                className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800"
+              >
+                Save Payment Settings
               </button>
             </div>
           )}
@@ -142,7 +246,11 @@ export function SystemSettings() {
                   <span className="text-sm font-medium text-foreground">{setting.name}</span>
                 </label>
               ))}
-              <button className="mt-4 rounded-md bg-foreground px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800">
+              <button
+                type="button"
+                onClick={() => saveSettings("notifications")}
+                className="mt-4 rounded-md bg-foreground px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800"
+              >
                 Save Preferences
               </button>
             </div>
@@ -153,8 +261,12 @@ export function SystemSettings() {
               <div className="rounded-lg border border-orange-200 bg-orange-50 p-4">
                 <p className="text-sm font-medium text-orange-700">🔒 Two-Factor Authentication</p>
                 <p className="text-xs text-orange-600 mt-1">Enhance account security with 2FA</p>
-                <button className="mt-3 rounded-md border border-orange-300 bg-white px-3 py-2 text-xs font-medium text-orange-700 transition hover:bg-orange-50">
-                  Enable 2FA
+                <button
+                  type="button"
+                  onClick={() => setSettingsState((current) => ({ ...current, twoFactorEnabled: !current.twoFactorEnabled }))}
+                  className="mt-3 rounded-md border border-orange-300 bg-white px-3 py-2 text-xs font-medium text-orange-700 transition hover:bg-orange-50"
+                >
+                  {settingsState.twoFactorEnabled ? "Disable 2FA" : "Enable 2FA"}
                 </button>
               </div>
               <div className="rounded-lg border border-border p-4">
@@ -176,11 +288,84 @@ export function SystemSettings() {
             </div>
           )}
 
-          {activeCategory !== "general" && activeCategory !== "notifications" && activeCategory !== "security" && (
-            <div className="rounded-lg border border-border bg-surface p-6 text-center">
-              <p className="text-muted text-sm">Settings for this category coming soon...</p>
+          {activeCategory === "internationalization" && (
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-foreground">Default Language</label>
+                <select
+                  value={settingsState.language}
+                  onChange={(event) => setSettingsState((current) => ({ ...current, language: event.target.value }))}
+                  className="mt-2 w-full rounded-lg border border-border px-3 py-2 text-sm outline-none"
+                >
+                  <option value="en">English</option>
+                  <option value="km">Khmer</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground">Default Currency</label>
+                <select
+                  value={settingsState.currency}
+                  onChange={(event) => setSettingsState((current) => ({ ...current, currency: event.target.value }))}
+                  className="mt-2 w-full rounded-lg border border-border px-3 py-2 text-sm outline-none"
+                >
+                  <option value="USD">USD</option>
+                  <option value="KHR">KHR</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground">Primary Region</label>
+                <input
+                  type="text"
+                  value={settingsState.region}
+                  onChange={(event) => setSettingsState((current) => ({ ...current, region: event.target.value }))}
+                  className="mt-2 w-full rounded-lg border border-border px-3 py-2 text-sm outline-none"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => saveSettings("settings")}
+                className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800"
+              >
+                Save Regional Settings
+              </button>
             </div>
           )}
+
+          {activeCategory === "access" && (
+            <div className="space-y-4">
+              <label className="flex items-center gap-3 rounded-lg border border-border p-3">
+                <input
+                  type="checkbox"
+                  checked={settingsState.allowVendorSelfSignup}
+                  onChange={(event) => setSettingsState((current) => ({ ...current, allowVendorSelfSignup: event.target.checked }))}
+                  className="h-4 w-4 rounded"
+                />
+                <span className="text-sm text-foreground">Allow vendor self-signup</span>
+              </label>
+              <div>
+                <label className="block text-sm font-medium text-foreground">Default New User Role</label>
+                <select
+                  value={settingsState.defaultRole}
+                  onChange={(event) => setSettingsState((current) => ({ ...current, defaultRole: event.target.value as "customer" | "vendor" }))}
+                  className="mt-2 w-full rounded-lg border border-border px-3 py-2 text-sm outline-none"
+                >
+                  <option value="customer">Customer</option>
+                  <option value="vendor">Vendor</option>
+                </select>
+              </div>
+              <button
+                type="button"
+                onClick={() => saveSettings("settings")}
+                className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800"
+              >
+                Save Access Control
+              </button>
+            </div>
+          )}
+
+          {statusMessage ? (
+            <p className="mt-4 rounded-md border border-border bg-surface px-3 py-2 text-sm text-muted">{statusMessage}</p>
+          ) : null}
         </div>
       </div>
     </div>

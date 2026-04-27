@@ -8,9 +8,11 @@ export type LibraryItem = {
   title: string;
   thumbnailUrl: string;
   documentationUrl: string;
+  previewUrl: string;
   s3Key: string;
   bankRef: string;
   licenseKey: string;
+  purchasedAt: string;
 };
 
 export async function getLibraryItems(userEmail: string): Promise<LibraryItem[]> {
@@ -32,11 +34,13 @@ export async function getLibraryItems(userEmail: string): Promise<LibraryItem[]>
     .select({
       templateId: purchases.templateId,
       transactionId: transactions.id,
+      purchasedAt: transactions.createdAt,
       bankRef: transactions.bankRef,
       licenseKey: purchases.licenseKey,
       title: templates.title,
       s3Key: templates.s3Key,
       previewUrl: templates.previewUrl,
+      documentationUrl: templates.documentationUrl,
     })
     .from(purchases)
     .innerJoin(
@@ -55,9 +59,11 @@ export async function getLibraryItems(userEmail: string): Promise<LibraryItem[]>
     transactionId: purchase.transactionId,
     title: purchase.title,
     thumbnailUrl: purchase.previewUrl ?? "/placeholder-product.svg",
-    documentationUrl: purchase.previewUrl ?? "",
+    documentationUrl: purchase.documentationUrl ?? "",
+    previewUrl: purchase.previewUrl ?? "",
     s3Key: purchase.s3Key,
     bankRef: purchase.bankRef ?? "",
     licenseKey: purchase.licenseKey,
+    purchasedAt: purchase.purchasedAt.toISOString(),
   }));
 }

@@ -1,82 +1,206 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Analite Kit
 
-## Getting Started
+Analite Kit is a Next.js marketplace for premium templates with secure checkout, purchase-gated downloads, profile/library access, dashboard operations, and production deployment on Vercel.
 
-First, run the development server:
+## Core Capabilities
+
+- Public catalog and product detail pages
+- KHQR and PayWay checkout initialization
+- Webhook-first payment completion
+- Secure download links for completed purchases only
+- Customer profile and library access actions
+- Admin dashboard for orders, reports, and vendor management
+- Email flows for signup verification and payment confirmation
+
+## Tech Stack
+
+- Next.js App Router
+- TypeScript
+- NextAuth
+- Drizzle ORM + PostgreSQL
+- Vercel hosting and routing
+
+## Local Development
+
+1. Install dependencies.
+
+```bash
+npm install
+```
+
+2. Configure environment variables.
+
+```bash
+cp .env.example .env.local
+```
+
+3. Run the app.
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## KHPay Setup
-
-Set these environment variables before running checkout:
-
-```bash
-KHPAY_API_KEY=your_api_key
-KHPAY_BASE_URL=https://api-sandbox.khpay.me/api/v1
-KHPAY_WEBHOOK_SECRET=your_webhook_secret
-NEXT_PUBLIC_SITE_URL=https://analite-kit.vercel.app
-```
-
-Webhook endpoint:
+4. Open:
 
 ```text
-https://analite-kit.vercel.app/api/payments/webhook
+http://localhost:3000
 ```
 
-The integration uses webhook-first confirmation with signature validation. Checkout status polling is also enabled as a fallback for resilience.
+## Environment Variables
 
-## Phase 8 Deployment Checklist
+Minimum required production variables (validated by `npm run check:env`):
 
-Validate required production environment variables:
+- `NEXTAUTH_SECRET`
+- `NEXTAUTH_URL`
+- `DATABASE_URL`
+- `KHPAY_PROXY_SECRET`
+- `KHPAY_WEBHOOK_SECRET`
+- `PAYMENT_ADMIN_SECRET`
+- One of:
+- `PAYWAY_LINK`
+- `ABA_PAYWAY_LINK`
+- `NEXT_PUBLIC_PAYWAY_LINK`
+- `KHPAY_API_KEY`
+
+Recommended:
+
+- `ADMIN_EMAIL`
+- `EMAIL_FROM`
+- `EMAIL_SERVER_HOST`
+- `EMAIL_SERVER_PORT`
+- `EMAIL_SERVER_USER`
+- `EMAIL_SERVER_PASSWORD`
+
+## Useful Commands
+
+```bash
+# development
+npm run dev
+
+# production build
+npm run build
+
+# environment check
+npm run check:env
+
+# strict environment check
+node scripts/check-env.mjs --strict
+
+# run migrations
+npx drizzle-kit migrate
+```
+
+## Payment and Security Notes
+
+- Buyer endpoint `/api/payments/confirm` must not self-complete pending payments.
+- Production webhook signature verification is required by default.
+- Payment completion and purchase creation run through hardened finalization logic.
+- Secure downloads require authenticated ownership of completed purchases.
+
+## Production Runbook
+
+Use this exact sequence for each release.
+
+### 1) Preflight
 
 ```bash
 npm run check:env
+npm run build
 ```
 
-Use strict mode to enforce optional analytics keys too:
+Optional strict checks:
 
 ```bash
 node scripts/check-env.mjs --strict
 ```
 
-Apply DB migrations (including performance indexes in `drizzle/0002_phase8_indexes.sql`):
+If schema changes exist:
 
 ```bash
 npx drizzle-kit migrate
 ```
 
-Recommended order before production deploy:
+### 2) Deploy
 
-1. Pull latest project env vars.
-2. Run `npm run check:env`.
-3. Run `npx drizzle-kit migrate`.
-4. Deploy with `npx vercel --prod`.
+```bash
+vercel deploy --prod --yes
+```
 
-## Learn More
+Then move primary alias:
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+vercel alias set <deployment-url> analite-kit.vercel.app
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### 3) Live Smoke Tests (Authenticated)
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Perform these checks while signed in to production.
 
-## Deploy on Vercel
+1. Create checkout
+- Endpoint: `POST /api/checkout`
+- Expected: `200` with `transactionId`
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+2. Attempt owner confirm for pending payment
+- Endpoint: `POST /api/payments/confirm`
+- Expected: `409` with pending-provider-confirmation message
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+3. Read transaction status
+- Endpoint: `GET /api/checkout/:transactionId`
+- Expected: status remains `pending` (until real provider confirmation)
+
+4. Existing account signup safety
+- Endpoint: `POST /api/auth/signup` with existing verified email
+- Expected: `409`
+
+5. Catalog degraded fallback sanity
+- Endpoint: `GET /api/catalog`
+- Expected: `200`, categories non-empty, vendor present on items
+
+### 4) Webhook Security Checks (Production)
+
+1. Missing signature
+- Expected: `401`
+
+2. Invalid signature
+- Expected: `401`
+
+3. Signature required but secret missing
+- Expected: `503`
+
+### 5) Post-deploy Validation
+
+For one real completed payment:
+
+- Transaction moves to `completed`
+- Purchases are created once (no duplication under concurrency)
+- Download link works for owner
+- Invoice endpoint works
+- Payment confirmation email is delivered (if SMTP configured)
+
+## Operational Monitoring Checklist
+
+Watch error rates and response anomalies for:
+
+- `/api/checkout`
+- `/api/checkout/:transactionId`
+- `/api/payments/confirm`
+- `/api/webhooks/payment`
+- `/api/downloads/secure`
+
+Alert on:
+
+- Spikes in webhook `401` or `503`
+- Checkout `5xx`
+- Download link generation failures
+
+## Deployment Discipline
+
+Keep this order for every release:
+
+1. `npm run check:env`
+2. `npm run build`
+3. `vercel deploy --prod --yes`
+4. `vercel alias set ... analite-kit.vercel.app`
+5. Live smoke tests
+
+Record each smoke test transaction ID for incident traceability.

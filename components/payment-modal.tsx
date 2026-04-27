@@ -63,6 +63,26 @@ export function PaymentModal({
   const [manualConfirmHint, setManualConfirmHint] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
 
+  function resetModalState() {
+    setPending(false);
+    setCheckoutData(null);
+    setSecondsLeft(0);
+    setSuccessCountdown(null);
+    setIsRedirecting(false);
+    setManualConfirmHint("");
+    setErrorMessage("");
+  }
+
+  function openModal() {
+    resetModalState();
+    setOpen(true);
+  }
+
+  function closeModal() {
+    setOpen(false);
+    resetModalState();
+  }
+
   useEffect(() => {
     if (!checkoutData?.expiresAt) {
       return;
@@ -203,20 +223,20 @@ export function PaymentModal({
     <>
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={openModal}
         className="rounded-md bg-foreground px-4 py-2 text-sm text-white transition hover:bg-slate-800"
       >
         Purchase
       </button>
 
       {open ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4">
-          <div className="w-full max-w-5xl rounded-xl border border-slate-200 bg-white p-4 shadow-2xl sm:p-8">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4" onClick={closeModal}>
+          <div className="max-h-[92vh] w-full max-w-5xl overflow-y-auto overflow-x-hidden rounded-xl border border-slate-200 bg-white p-4 shadow-2xl sm:p-8" onClick={(event) => event.stopPropagation()}>
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-lg font-semibold text-foreground">Secure Checkout</h2>
               <button
                 type="button"
-                onClick={() => setOpen(false)}
+                onClick={closeModal}
                 className="rounded-md border border-border p-2 text-muted transition hover:text-foreground"
                 aria-label="Close checkout"
               >
@@ -315,7 +335,7 @@ export function PaymentModal({
                     </div>
 
                     {checkoutData.khqrString ? (
-                      <div className="mx-auto mt-4 flex h-[260px] w-[260px] items-center justify-center rounded-md border border-[#cfdbf2] bg-white p-2">
+                      <div className="mx-auto mt-4 flex aspect-square w-full max-w-[260px] items-center justify-center rounded-md border border-[#cfdbf2] bg-white p-2">
                         <QRCodeSVG
                           value={checkoutData.khqrString}
                           size={240}
@@ -325,7 +345,7 @@ export function PaymentModal({
                       </div>
                     ) : checkoutData.provider === "aba-payway" && checkoutData.paymentUrl ? (
                       <div className="mx-auto mt-4 flex flex-col items-center gap-1">
-                        <div className="flex h-[260px] w-[260px] items-center justify-center rounded-md border border-[#cfdbf2] bg-white p-2">
+                        <div className="flex aspect-square w-full max-w-[260px] items-center justify-center rounded-md border border-[#cfdbf2] bg-white p-2">
                           <QRCodeSVG
                             value={checkoutData.paymentUrl}
                             size={240}

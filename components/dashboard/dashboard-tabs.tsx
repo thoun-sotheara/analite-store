@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 type DashboardTabsProps = {
   overview: React.ReactNode;
   catalog: React.ReactNode;
   orders: React.ReactNode;
   admin: React.ReactNode;
+  initialTab?: TabId;
 };
 
 const tabs = [
@@ -18,8 +19,12 @@ const tabs = [
 
 type TabId = (typeof tabs)[number]["id"];
 
-export function DashboardTabs({ overview, catalog, orders, admin }: DashboardTabsProps) {
-  const [active, setActive] = useState<TabId>("overview");
+export function DashboardTabs({ overview, catalog, orders, admin, initialTab = "overview" }: DashboardTabsProps) {
+  const [active, setActive] = useState<TabId>(initialTab);
+
+  useEffect(() => {
+    setActive(initialTab);
+  }, [initialTab]);
 
   return (
     <section className="mt-8">

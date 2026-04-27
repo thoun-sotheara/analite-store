@@ -119,6 +119,61 @@ function toLabel(slug: string): string {
     .join(" ");
 }
 
+type TemplateLiteRow = {
+  id: string;
+  slug: string | null;
+  title: string;
+  description: string | null;
+  category: string;
+  priceUsd: string | number;
+  s3Key: string;
+  previewUrl: string | null;
+  documentationUrl: string | null;
+  techStack: string | null;
+  screenMockupUrl: string | null;
+  galleryImage1: string | null;
+  galleryImage2: string | null;
+  galleryImage3: string | null;
+  galleryImage4: string | null;
+  downloadCount: number;
+  viewCount: number;
+  updatedAt: Date | null;
+  isActive: boolean;
+};
+
+function toTemplateItemFromLiteRow(row: TemplateLiteRow): TemplateItem {
+  return {
+    id: row.id,
+    slug: row.slug ?? row.id,
+    title: row.title,
+    description: row.description ?? "",
+    category: row.category,
+    categoryLabel: toLabel(row.category),
+    priceUsd: Number(row.priceUsd),
+    s3Key: row.s3Key,
+    previewUrl: row.previewUrl ?? "",
+    documentationUrl: row.documentationUrl ?? "",
+    rating: 0,
+    reviewCount: 0,
+    downloadCount: Number(row.downloadCount ?? 0),
+    viewCount: Number(row.viewCount ?? 0),
+    techStack: row.techStack ?? "Next.js",
+    updatedLabel: row.updatedAt ? formatRelative(new Date(row.updatedAt)) : "Recently updated",
+    screenMockupUrl: row.screenMockupUrl ?? "/placeholder-product.svg",
+    galleryImage1: row.galleryImage1,
+    galleryImage2: row.galleryImage2,
+    galleryImage3: row.galleryImage3,
+    galleryImage4: row.galleryImage4,
+    vendor: {
+      slug: "analite",
+      name: "Analite Studio",
+      verified: false,
+      bio: "",
+      location: "Cambodia",
+    },
+  };
+}
+
 function formatRelative(date: Date): string {
   const diff = Date.now() - date.getTime();
   const days = Math.floor(diff / 86_400_000);
@@ -176,44 +231,80 @@ export async function getAllTemplates(): Promise<TemplateItem[]> {
 export async function getTemplateBySlug(slug: string): Promise<TemplateItem | null> {
   if (!db) return null;
 
-  const rows = await db
-    .select({
-      id: templates.id,
-      slug: templates.slug,
-      title: templates.title,
-      description: templates.description,
-      category: templates.category,
-      categoryTitle: categories.title,
-      priceUsd: templates.priceUsd,
-      s3Key: templates.s3Key,
-      previewUrl: templates.previewUrl,
-      documentationUrl: templates.documentationUrl,
-      techStack: templates.techStack,
-      screenMockupUrl: templates.screenMockupUrl,
-      galleryImage1: templates.galleryImage1,
-      galleryImage2: templates.galleryImage2,
-      galleryImage3: templates.galleryImage3,
-      galleryImage4: templates.galleryImage4,
-      downloadCount: templates.downloadCount,
-      viewCount: templates.viewCount,
-      updatedAt: templates.updatedAt,
-      vendorId: templates.vendorId,
-      vendorSlug: users.slug,
-      vendorName: users.name,
-      vendorDisplayName: vendorProfiles.displayName,
-      vendorBio: vendorProfiles.bio,
-      vendorLocation: vendorProfiles.location,
-      vendorVerified: vendorProfiles.isVerified,
-    })
-    .from(templates)
-    .leftJoin(categories, eq(categories.id, templates.categoryId))
-    .leftJoin(users, eq(users.id, templates.vendorId))
-    .leftJoin(vendorProfiles, eq(vendorProfiles.userId, templates.vendorId))
-    .where(eq(templates.slug, slug))
-    .limit(1);
+  try {
+    const rows = await db
+      .select({
+        id: templates.id,
+        slug: templates.slug,
+        title: templates.title,
+        description: templates.description,
+        category: templates.category,
+        categoryTitle: categories.title,
+        priceUsd: templates.priceUsd,
+        s3Key: templates.s3Key,
+        previewUrl: templates.previewUrl,
+        documentationUrl: templates.documentationUrl,
+        techStack: templates.techStack,
+        screenMockupUrl: templates.screenMockupUrl,
+        galleryImage1: templates.galleryImage1,
+        galleryImage2: templates.galleryImage2,
+        galleryImage3: templates.galleryImage3,
+        galleryImage4: templates.galleryImage4,
+        downloadCount: templates.downloadCount,
+        viewCount: templates.viewCount,
+        updatedAt: templates.updatedAt,
+        vendorId: templates.vendorId,
+        vendorSlug: users.slug,
+        vendorName: users.name,
+        vendorDisplayName: vendorProfiles.displayName,
+        vendorBio: vendorProfiles.bio,
+        vendorLocation: vendorProfiles.location,
+        vendorVerified: vendorProfiles.isVerified,
+      })
+      .from(templates)
+      .leftJoin(categories, eq(categories.id, templates.categoryId))
+      .leftJoin(users, eq(users.id, templates.vendorId))
+      .leftJoin(vendorProfiles, eq(vendorProfiles.userId, templates.vendorId))
+      .where(eq(templates.slug, slug))
+      .limit(1);
 
-  const [row] = await attachReviewMetrics(rows);
-  return row ? toTemplateItem(row) : null;
+    const [row] = await attachReviewMetrics(rows);
+    return row ? toTemplateItem(row) : null;
+  } catch {
+    try {
+      const rows = await db
+        .select({
+          id: templates.id,
+          slug: templates.slug,
+          title: templates.title,
+          description: templates.description,
+          category: templates.category,
+          priceUsd: templates.priceUsd,
+          s3Key: templates.s3Key,
+          previewUrl: templates.previewUrl,
+          documentationUrl: templates.documentationUrl,
+          techStack: templates.techStack,
+          screenMockupUrl: templates.screenMockupUrl,
+          galleryImage1: templates.galleryImage1,
+          galleryImage2: templates.galleryImage2,
+          galleryImage3: templates.galleryImage3,
+          galleryImage4: templates.galleryImage4,
+          downloadCount: templates.downloadCount,
+          viewCount: templates.viewCount,
+          updatedAt: templates.updatedAt,
+          isActive: templates.isActive,
+        })
+        .from(templates)
+        .where(eq(templates.slug, slug))
+        .limit(1);
+
+      const row = rows[0];
+      if (!row || !row.isActive) return null;
+      return toTemplateItemFromLiteRow(row);
+    } catch {
+      return null;
+    }
+  }
 }
 
 // ─── getTemplateById ──────────────────────────────────────────────────────────
@@ -221,44 +312,80 @@ export async function getTemplateById(id: string): Promise<TemplateItem | null> 
   if (!db) return null;
   if (!UUID_V4_LIKE_PATTERN.test(id)) return null;
 
-  const rows = await db
-    .select({
-      id: templates.id,
-      slug: templates.slug,
-      title: templates.title,
-      description: templates.description,
-      category: templates.category,
-      categoryTitle: categories.title,
-      priceUsd: templates.priceUsd,
-      s3Key: templates.s3Key,
-      previewUrl: templates.previewUrl,
-      documentationUrl: templates.documentationUrl,
-      techStack: templates.techStack,
-      screenMockupUrl: templates.screenMockupUrl,
-      galleryImage1: templates.galleryImage1,
-      galleryImage2: templates.galleryImage2,
-      galleryImage3: templates.galleryImage3,
-      galleryImage4: templates.galleryImage4,
-      downloadCount: templates.downloadCount,
-      viewCount: templates.viewCount,
-      updatedAt: templates.updatedAt,
-      vendorId: templates.vendorId,
-      vendorSlug: users.slug,
-      vendorName: users.name,
-      vendorDisplayName: vendorProfiles.displayName,
-      vendorBio: vendorProfiles.bio,
-      vendorLocation: vendorProfiles.location,
-      vendorVerified: vendorProfiles.isVerified,
-    })
-    .from(templates)
-    .leftJoin(categories, eq(categories.id, templates.categoryId))
-    .leftJoin(users, eq(users.id, templates.vendorId))
-    .leftJoin(vendorProfiles, eq(vendorProfiles.userId, templates.vendorId))
-    .where(eq(templates.id, id))
-    .limit(1);
+  try {
+    const rows = await db
+      .select({
+        id: templates.id,
+        slug: templates.slug,
+        title: templates.title,
+        description: templates.description,
+        category: templates.category,
+        categoryTitle: categories.title,
+        priceUsd: templates.priceUsd,
+        s3Key: templates.s3Key,
+        previewUrl: templates.previewUrl,
+        documentationUrl: templates.documentationUrl,
+        techStack: templates.techStack,
+        screenMockupUrl: templates.screenMockupUrl,
+        galleryImage1: templates.galleryImage1,
+        galleryImage2: templates.galleryImage2,
+        galleryImage3: templates.galleryImage3,
+        galleryImage4: templates.galleryImage4,
+        downloadCount: templates.downloadCount,
+        viewCount: templates.viewCount,
+        updatedAt: templates.updatedAt,
+        vendorId: templates.vendorId,
+        vendorSlug: users.slug,
+        vendorName: users.name,
+        vendorDisplayName: vendorProfiles.displayName,
+        vendorBio: vendorProfiles.bio,
+        vendorLocation: vendorProfiles.location,
+        vendorVerified: vendorProfiles.isVerified,
+      })
+      .from(templates)
+      .leftJoin(categories, eq(categories.id, templates.categoryId))
+      .leftJoin(users, eq(users.id, templates.vendorId))
+      .leftJoin(vendorProfiles, eq(vendorProfiles.userId, templates.vendorId))
+      .where(eq(templates.id, id))
+      .limit(1);
 
-  const [row] = await attachReviewMetrics(rows);
-  return row ? toTemplateItem(row) : null;
+    const [row] = await attachReviewMetrics(rows);
+    return row ? toTemplateItem(row) : null;
+  } catch {
+    try {
+      const rows = await db
+        .select({
+          id: templates.id,
+          slug: templates.slug,
+          title: templates.title,
+          description: templates.description,
+          category: templates.category,
+          priceUsd: templates.priceUsd,
+          s3Key: templates.s3Key,
+          previewUrl: templates.previewUrl,
+          documentationUrl: templates.documentationUrl,
+          techStack: templates.techStack,
+          screenMockupUrl: templates.screenMockupUrl,
+          galleryImage1: templates.galleryImage1,
+          galleryImage2: templates.galleryImage2,
+          galleryImage3: templates.galleryImage3,
+          galleryImage4: templates.galleryImage4,
+          downloadCount: templates.downloadCount,
+          viewCount: templates.viewCount,
+          updatedAt: templates.updatedAt,
+          isActive: templates.isActive,
+        })
+        .from(templates)
+        .where(eq(templates.id, id))
+        .limit(1);
+
+      const row = rows[0];
+      if (!row || !row.isActive) return null;
+      return toTemplateItemFromLiteRow(row);
+    } catch {
+      return null;
+    }
+  }
 }
 
 // ─── getTemplatesByVendorSlug ─────────────────────────────────────────────────

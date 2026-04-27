@@ -12,8 +12,25 @@ import { ReviewList } from "@/components/reviews/review-list";
 import { useSmartRecommendations } from "@/components/product/use-smart-recommendations";
 import { TrackRecentView } from "@/components/wishlist/track-recent-view";
 import { WishlistButton } from "@/components/wishlist/wishlist-button";
+import type { ReviewEligibility } from "@/app/actions/reviews";
 import type { TemplateReview } from "@/lib/data/mock-templates";
 import { useCurrency } from "@/components/currency/currency-provider";
+
+type ProductAccessState = {
+  hasAccess: boolean;
+  requiresSignIn: boolean;
+  transactionId: string;
+  purchasedAt: string;
+  licenseKey: string;
+  previewUrl: string;
+  documentationUrl: string;
+  message: string;
+};
+
+function formatCount(value: unknown): string {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed.toLocaleString() : "0";
+}
 
 function StarRating({ rating, count }: { rating: number; count: number }) {
   return (
@@ -43,10 +60,30 @@ export default function ProductDetailPage() {
   const template = items.find((item) => item.id === params.templateId || item.slug === params.templateId);
   const { related } = useSmartRecommendations(template?.id);
   const [reviews, setReviews] = useState<TemplateReview[]>([]);
+  const [reviewEligibility, setReviewEligibility] = useState<ReviewEligibility>({
+    canReview: false,
+    hasPurchased: false,
+    hasReviewed: false,
+    requiresSignIn: true,
+    message: "Sign in to check whether you can leave a verified buyer review.",
+  });
   const [mainImageUrl, setMainImageUrl] = useState<string>("");
   const [showZoomModal, setShowZoomModal] = useState(false);
   const [zoomImageUrl, setZoomImageUrl] = useState<string>("");
   const [viewCount, setViewCount] = useState<number>(0);
+  const [accessState, setAccessState] = useState<ProductAccessState>({
+    hasAccess: false,
+    requiresSignIn: false,
+    transactionId: "",
+    purchasedAt: "",
+    licenseKey: "",
+    previewUrl: "",
+    documentationUrl: "",
+    message: "",
+  });
+  const [accessLoading, setAccessLoading] = useState(false);
+  const [downloadPending, setDownloadPending] = useState(false);
+  const [accessNotice, setAccessNotice] = useState("");
 
   useEffect(() => {
     if (!template?.id) {
@@ -58,13 +95,29 @@ export default function ProductDetailPage() {
 
     fetch(`/api/catalog/${template.id}/reviews`, { cache: "no-store" })
       .then((response) => (response.ok ? response.json() : null))
-      .then((payload: { reviews?: TemplateReview[] } | null) => {
+      .then((payload: { reviews?: TemplateReview[]; eligibility?: ReviewEligibility } | null) => {
         if (!active) return;
         setReviews(payload?.reviews ?? []);
+        setReviewEligibility(
+          payload?.eligibility ?? {
+            canReview: false,
+            hasPurchased: false,
+            hasReviewed: false,
+            requiresSignIn: true,
+            message: "Sign in to check whether you can leave a verified buyer review.",
+          },
+        );
       })
       .catch(() => {
         if (!active) return;
         setReviews([]);
+        setReviewEligibility({
+          canReview: false,
+          hasPurchased: false,
+          hasReviewed: false,
+          requiresSignIn: true,
+          message: "Unable to load review access right now.",
+        });
       });
 
     return () => {
@@ -74,9 +127,7 @@ export default function ProductDetailPage() {
 
   // Set main image on template change
   useEffect(() => {
-    if (template?.screenMockupUrl) {
-      setMainImageUrl(template.screenMockupUrl);
-    }
+    setMainImageUrl(template?.screenMockupUrl || "/placeholder-product.svg");
   }, [template?.screenMockupUrl]);
 
   useEffect(() => {
@@ -105,6 +156,87 @@ export default function ProductDetailPage() {
       });
   }, [template?.id]);
 
+  useEffect(() => {
+    if (!template?.id) {
+      setAccessState({
+        hasAccess: false,
+        requiresSignIn: false,
+        transactionId: "",
+        purchasedAt: "",
+        licenseKey: "",
+        previewUrl: "",
+        documentationUrl: "",
+        message: "",
+      });
+      return;
+    }
+
+    let active = true;
+    setAccessLoading(true);
+    setAccessNotice("");
+
+    fetch(`/api/catalog/${template.id}/access`, { cache: "no-store" })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((payload: Partial<ProductAccessState> | null) => {
+        if (!active) return;
+
+        setAccessState({
+          hasAccess: Boolean(payload?.hasAccess),
+          requiresSignIn: Boolean(payload?.requiresSignIn),
+          transactionId: payload?.transactionId ?? "",
+          purchasedAt: payload?.purchasedAt ?? "",
+          licenseKey: payload?.licenseKey ?? "",
+          previewUrl: payload?.previewUrl ?? "",
+          documentationUrl: payload?.documentationUrl ?? "",
+          message: payload?.message ?? "",
+        });
+      })
+      .catch(() => {
+        if (!active) return;
+        setAccessState((current) => ({ ...current, message: "Unable to verify purchase access right now." }));
+      })
+      .finally(() => {
+        if (!active) return;
+        setAccessLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [template?.id]);
+
+  async function downloadPurchasedTemplate() {
+    if (!template?.id || !accessState.transactionId) {
+      return;
+    }
+
+    try {
+      setDownloadPending(true);
+      setAccessNotice("");
+      const response = await fetch("/api/downloads/secure", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          transactionId: accessState.transactionId,
+          templateId: template.id,
+        }),
+      });
+
+      const payload = (await response.json()) as { ok?: boolean; url?: string; message?: string };
+      if (!response.ok || !payload.ok || !payload.url) {
+        setAccessNotice(payload.message ?? "Unable to create a secure download link.");
+        return;
+      }
+
+      setAccessNotice(payload.message ?? "Your secure download link is ready.");
+      window.location.href = payload.url;
+    } catch {
+      setAccessNotice("Unable to create a secure download link.");
+    } finally {
+      setDownloadPending(false);
+    }
+  }
+
   if (isLoading) {
     return (
       <main className="mx-auto w-full max-w-6xl px-4 pb-16 pt-8 sm:px-6 md:px-8 lg:px-12">
@@ -131,6 +263,7 @@ export default function ProductDetailPage() {
   }
 
   const relatedTemplates = related.filter((item) => item.category === template.category).slice(0, 3);
+  const safeMainImageUrl = mainImageUrl || template.screenMockupUrl || "/placeholder-product.svg";
 
   return (
     <main className="mx-auto w-full max-w-6xl px-4 pb-16 pt-8 sm:px-6 md:px-8 lg:px-12">
@@ -140,13 +273,13 @@ export default function ProductDetailPage() {
           {/* Main image with zoom on click */}
           <div
             onClick={() => {
-              setZoomImageUrl(mainImageUrl);
+              setZoomImageUrl(safeMainImageUrl);
               setShowZoomModal(true);
             }}
             className="relative aspect-[16/10] w-full border-b border-border bg-surface cursor-pointer group"
           >
             <Image
-              src={mainImageUrl}
+              src={safeMainImageUrl}
               alt={template.title}
               fill
               sizes="(max-width: 1024px) 100vw, 50vw"
@@ -219,14 +352,14 @@ export default function ProductDetailPage() {
               <span className="text-muted">Downloads</span>
               <span className="flex items-center gap-1 font-semibold text-foreground">
                 <Download className="h-3.5 w-3.5" />
-                {template.downloadCount.toLocaleString()}
+                {formatCount(template.downloadCount)}
               </span>
             </div>
             <div className="flex items-center justify-between rounded-md border border-border bg-surface p-2.5">
               <span className="text-muted">Views</span>
               <span className="flex items-center gap-1 font-semibold text-foreground">
                 <Eye className="h-3.5 w-3.5" />
-                {viewCount.toLocaleString()}
+                {formatCount(viewCount)}
               </span>
             </div>
             <div className="flex items-center justify-between rounded-md border border-border bg-surface p-2.5">
@@ -283,6 +416,52 @@ export default function ProductDetailPage() {
             />
           </div>
 
+          <div className="mt-5 rounded-md border border-border bg-surface p-4 text-sm">
+            <p className="font-medium text-foreground">Your Access</p>
+            {accessLoading ? (
+              <p className="mt-2 text-muted">Checking your purchase access...</p>
+            ) : accessState.hasAccess ? (
+              <>
+                <p className="mt-2 text-muted">You own this product. Download, receipt, and preview links are unlocked for this item.</p>
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    onClick={downloadPurchasedTemplate}
+                    disabled={downloadPending}
+                    className="inline-flex items-center justify-center rounded-md bg-foreground px-3 py-2 text-sm font-medium text-white transition hover:bg-slate-800 disabled:opacity-60"
+                  >
+                    {downloadPending ? "Preparing secure file..." : "Download ZIP"}
+                  </button>
+                  <Link
+                    href={`/api/invoice/${accessState.transactionId}`}
+                    target="_blank"
+                    className="inline-flex items-center justify-center rounded-md border border-border px-3 py-2 text-sm font-medium text-foreground transition hover:bg-slate-50"
+                  >
+                    Download Receipt
+                  </Link>
+                  <Link
+                    href={`/preview/${template.id}`}
+                    className="inline-flex items-center justify-center rounded-md border border-border px-3 py-2 text-sm font-medium text-foreground transition hover:bg-slate-50"
+                  >
+                    Open Preview
+                  </Link>
+                  <Link
+                    href={accessState.documentationUrl || "/support"}
+                    target="_blank"
+                    className="inline-flex items-center justify-center rounded-md border border-border px-3 py-2 text-sm font-medium text-foreground transition hover:bg-slate-50"
+                  >
+                    {accessState.documentationUrl ? "Open Documentation" : "Open Support"}
+                  </Link>
+                </div>
+              </>
+            ) : (
+              <p className="mt-2 text-muted">
+                {accessState.message || "Purchase this product to unlock download, receipt, and full access links."}
+              </p>
+            )}
+            {accessNotice ? <p className="mt-3 text-xs text-muted">{accessNotice}</p> : null}
+          </div>
+
           <div className="mt-6 rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
             <p className="font-medium">What's included</p>
             <ul className="mt-2 space-y-1 text-xs">
@@ -321,11 +500,25 @@ export default function ProductDetailPage() {
               <p className="font-medium text-foreground">Can I request support?</p>
               <p className="mt-1">Yes. Documentation and contact details are included in your order access.</p>
             </div>
+            <div>
+              <p className="font-medium text-foreground">How do reviews work?</p>
+              <p className="mt-1">Verified buyer reviews can be submitted from this product page after a completed purchase.</p>
+            </div>
           </div>
         </article>
       </section>
 
-      <ReviewList rating={template.rating} reviewCount={template.reviewCount} reviews={reviews} />
+      <ReviewList
+        templateId={template.id}
+        rating={template.rating}
+        reviewCount={template.reviewCount}
+        reviews={reviews}
+        eligibility={reviewEligibility}
+        onReviewsUpdated={(nextReviews, nextEligibility) => {
+          setReviews(nextReviews);
+          setReviewEligibility(nextEligibility);
+        }}
+      />
 
       {relatedTemplates.length > 0 ? (
         <section className="mt-8">

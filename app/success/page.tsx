@@ -31,7 +31,14 @@ export default async function SuccessPage({ searchParams }: SuccessPageProps) {
   }
 
   let purchasedTemplateIds: string[] = [];
-  let purchasedTemplates: Array<{ id: string; title: string }> = [];
+  let purchasedTemplates: Array<{
+    purchaseId: string;
+    templateId: string;
+    title: string;
+    previewUrl: string;
+    documentationUrl: string;
+    licenseKey: string;
+  }> = [];
   let relatedTemplates: Array<{ id: string; title: string }> = [];
   let hasAuthorizedPurchase = false;
   if (db) {
@@ -64,8 +71,12 @@ export default async function SuccessPage({ searchParams }: SuccessPageProps) {
     if (owner) {
       const rows = await db
         .select({
+          purchaseId: purchases.id,
           templateId: purchases.templateId,
           templateTitle: templates.title,
+          previewUrl: templates.previewUrl,
+          documentationUrl: templates.documentationUrl,
+          licenseKey: purchases.licenseKey,
         })
         .from(purchases)
         .innerJoin(
@@ -94,8 +105,12 @@ export default async function SuccessPage({ searchParams }: SuccessPageProps) {
       purchasedTemplateIds = rows.map((row) => row.templateId);
 
       purchasedTemplates = rows.map((row) => ({
-        id: row.templateId,
+        purchaseId: row.purchaseId,
+        templateId: row.templateId,
         title: row.templateTitle,
+        previewUrl: row.previewUrl ?? "",
+        documentationUrl: row.documentationUrl ?? "",
+        licenseKey: row.licenseKey,
       }));
 
       if (purchasedTemplateIds.length > 0) {
@@ -153,11 +168,40 @@ export default async function SuccessPage({ searchParams }: SuccessPageProps) {
         ) : (
           <div className="mt-4 space-y-4">
             {purchasedTemplates.map((template) => {
-              const action = createDownloadLinkAction.bind(null, transactionId, template.id);
+              const action = createDownloadLinkAction.bind(null, transactionId, template.templateId);
               return (
-                <div key={template.id} className="rounded-xl border border-border bg-white/80 p-4">
+                <div key={template.purchaseId} className="rounded-xl border border-border bg-white/80 p-4">
                   <p className="text-sm font-semibold text-foreground">{template.title}</p>
+                  <p className="mt-1 break-all text-xs text-muted">License: {template.licenseKey}</p>
                   <DownloadButton action={action} />
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    <Link
+                      href={`/api/invoice/${transactionId}`}
+                      target="_blank"
+                      className="inline-flex items-center justify-center rounded-md border border-border px-3 py-2 text-sm text-foreground transition hover:bg-slate-50"
+                    >
+                      Download Receipt
+                    </Link>
+                    <Link
+                      href={`/preview/${template.templateId}`}
+                      className="inline-flex items-center justify-center rounded-md border border-border px-3 py-2 text-sm text-foreground transition hover:bg-slate-50"
+                    >
+                      Live Preview
+                    </Link>
+                    <Link
+                      href={`/products/${template.templateId}`}
+                      className="inline-flex items-center justify-center rounded-md border border-border px-3 py-2 text-sm text-foreground transition hover:bg-slate-50"
+                    >
+                      Open Product
+                    </Link>
+                    <Link
+                      href={template.documentationUrl || "/support"}
+                      target="_blank"
+                      className="inline-flex items-center justify-center rounded-md border border-border px-3 py-2 text-sm text-foreground transition hover:bg-slate-50"
+                    >
+                      {template.documentationUrl ? "Documentation" : "Support"}
+                    </Link>
+                  </div>
                 </div>
               );
             })}

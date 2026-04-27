@@ -11,6 +11,7 @@ import { RevenueBreakdown } from "@/components/dashboard/revenue-breakdown";
 import { ExportReports } from "@/components/dashboard/export-reports";
 import { SystemSettings } from "@/components/dashboard/system-settings";
 import { DashboardTabs } from "@/components/dashboard/dashboard-tabs";
+import Link from "next/link";
 import { getDashboardAnalytics } from "@/lib/db/dashboard-analytics";
 import {
   getDashboardActivity,
@@ -20,11 +21,13 @@ import {
 } from "@/lib/db/dashboard-data";
 
 const quickActions = [
-  { label: "Add New Product", href: "#", icon: "📦" },
-  { label: "View Reports", href: "#", icon: "📊" },
-  { label: "Manage Users", href: "#", icon: "👥" },
-  { label: "Email Templates", href: "#", icon: "✉️" },
+  { label: "Add New Product", href: "/dashboard?tab=catalog#template-manager", icon: "📦" },
+  { label: "View Reports", href: "/dashboard?tab=admin#export-reports", icon: "📊" },
+  { label: "Manage Users", href: "/dashboard?tab=admin#system-settings", icon: "👥" },
+  { label: "Email Templates", href: "mailto:support@analite-kit.vercel.app?subject=Email%20Template%20Request", icon: "✉️" },
 ];
+
+const validTabs = new Set(["overview", "catalog", "orders", "admin"] as const);
 
 function formatUsd(value: number): string {
   return new Intl.NumberFormat("en-US", {
@@ -34,7 +37,17 @@ function formatUsd(value: number): string {
   }).format(value);
 }
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ tab?: string }>;
+}) {
+  const params = searchParams ? await searchParams : undefined;
+  const requestedTab = params?.tab;
+  const initialTab = requestedTab && validTabs.has(requestedTab as "overview" | "catalog" | "orders" | "admin")
+    ? (requestedTab as "overview" | "catalog" | "orders" | "admin")
+    : "overview";
+
   const [analytics, statsData, customersData, activityData, inventoryData] = await Promise.all([
     getDashboardAnalytics(),
     getDashboardStats(),
@@ -136,16 +149,17 @@ export default async function DashboardPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <button className="rounded-md border border-border px-4 py-2 text-sm font-medium text-foreground transition hover:bg-slate-50">
+          <Link href="/dashboard?tab=admin#export-reports" className="rounded-md border border-border px-4 py-2 text-sm font-medium text-foreground transition hover:bg-slate-50">
             📥 Export Report
-          </button>
-          <button className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800">
+          </Link>
+          <Link href="/dashboard?tab=admin#system-settings" className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800">
             ⚙️ Settings
-          </button>
+          </Link>
         </div>
       </div>
 
       <DashboardTabs
+        initialTab={initialTab}
         overview={(
           <>
             <section className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
@@ -166,12 +180,13 @@ export default async function DashboardPage() {
                 <h3 className="text-lg font-semibold text-foreground">Quick Actions</h3>
                 <div className="mt-4 space-y-2">
                   {quickActions.map((action) => (
-                    <button
+                    <Link
                       key={action.label}
-                      className="w-full rounded-lg border border-border bg-surface px-4 py-2 text-left text-sm font-medium text-foreground transition hover:border-foreground"
+                      href={action.href}
+                      className="block w-full rounded-lg border border-border bg-surface px-4 py-2 text-left text-sm font-medium text-foreground transition hover:border-foreground"
                     >
                       {action.icon} {action.label}
-                    </button>
+                    </Link>
                   ))}
                 </div>
               </div>

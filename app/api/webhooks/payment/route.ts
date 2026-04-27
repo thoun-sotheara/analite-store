@@ -107,7 +107,8 @@ export async function POST(request: NextRequest) {
     ?? request.headers.get("x-callback-signature")
     ?? "";
   const secret = (process.env.KHPAY_WEBHOOK_SECRET ?? "").trim();
-  const requireSignature = (process.env.KHPAY_REQUIRE_SIGNATURE ?? "false").toLowerCase() === "true";
+  const requireSignatureDefault = process.env.NODE_ENV === "production" ? "true" : "false";
+  const requireSignature = (process.env.KHPAY_REQUIRE_SIGNATURE ?? requireSignatureDefault).toLowerCase() === "true";
 
   console.log("[webhook] incoming", {
     hasSignature: Boolean(signature),
@@ -115,6 +116,13 @@ export async function POST(request: NextRequest) {
     hasSecret: Boolean(secret),
     requireSignature,
   });
+
+  if (requireSignature && !secret) {
+    return NextResponse.json(
+      { ok: false, message: "Webhook signature secret is not configured." },
+      { status: 503 },
+    );
+  }
 
   if (secret) {
     if (!signature && requireSignature) {

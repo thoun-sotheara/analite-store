@@ -14,7 +14,7 @@ const checkoutItemSchema = z.object({
 });
 
 const checkoutSchema = z.object({
-  provider: z.enum(["khpay", "aba", "bakong"]).optional().default("khpay"),
+  provider: z.literal("khpay").optional().default("khpay"),
   templateId: z.string().min(1).optional(),
   items: z.array(checkoutItemSchema).min(1).max(20).optional(),
 }).refine((value) => Boolean(value.templateId) || Boolean(value.items?.length), {

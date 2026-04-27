@@ -136,7 +136,7 @@ const authOptions: NextAuthOptions = {
           target: users.email,
           set: {
             name: user.name ?? email.split("@")[0],
-            role: resolveRoleFromEmail(email, ADMIN_EMAIL),
+            updatedAt: new Date(),
           },
         });
 

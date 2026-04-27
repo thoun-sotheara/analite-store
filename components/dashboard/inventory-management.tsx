@@ -87,7 +87,7 @@ export function InventoryManagement({ inventoryItems }: InventoryManagementProps
                 <td className="py-3 pr-4 text-center">
                   <div className="flex items-center justify-center gap-1">
                     <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
-                    <span className="font-semibold text-foreground">{item.rating.toFixed(1)}</span>
+                    <span className="font-semibold text-foreground">{item.rating > 0 ? item.rating.toFixed(1) : "No rating"}</span>
                   </div>
                 </td>
                 <td className="py-3 pr-4 text-center font-semibold text-foreground">{formatUsd(item.revenueUsd)}</td>

@@ -4,7 +4,7 @@ import { getToken } from "next-auth/jwt";
 import { resolveRoleFromEmail } from "@/lib/auth/role";
 
 const protectedRoutes = ["/dashboard", "/downloads", "/library", "/profile", "/checkout", "/success"];
-const ADMIN_EMAIL = (process.env.ADMIN_EMAIL ?? "admin@analite.store").toLowerCase();
+const ADMIN_EMAIL = (process.env.ADMIN_EMAIL ?? "").toLowerCase();
 
 export default async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;

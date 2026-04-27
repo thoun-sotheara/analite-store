@@ -11,6 +11,11 @@ import { hasCookieConsent, readJsonCookie, setJsonCookie } from "@/lib/web/cooki
 
 type HomeSort = "smart" | "popular" | "price-asc" | "price-desc" | "rating";
 
+function formatCount(value: unknown): string {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed.toLocaleString() : "0";
+}
+
 const CATEGORY_LIMIT = 6;
 const FILTER_LIMIT = 12;
 const HOME_FILTER_COOKIE_KEY = "analite_home_filters";
@@ -389,7 +394,7 @@ export default function Home() {
               >
                 <p className="line-clamp-1 text-sm font-semibold text-foreground">{item.title}</p>
                 <p className="mt-1 text-xs text-muted">
-                  {item.categoryLabel} | {item.downloadCount.toLocaleString()} downloads
+                  {item.categoryLabel} | {formatCount(item.downloadCount)} downloads
                 </p>
               </Link>
             ))}

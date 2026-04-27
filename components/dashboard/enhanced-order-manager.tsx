@@ -31,6 +31,8 @@ export function EnhancedOrderManager() {
   const [query, setQuery] = useState("");
   const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [statusMessage, setStatusMessage] = useState("");
+  const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
 
   const fetchOrders = useCallback(async () => {
     setLoading(true);
@@ -52,6 +54,35 @@ export function EnhancedOrderManager() {
   useEffect(() => {
     void fetchOrders();
   }, [fetchOrders]);
+
+  async function markAsCompleted(orderId: string) {
+    setUpdatingOrderId(orderId);
+    setStatusMessage("");
+    try {
+      const response = await fetch(`/api/dashboard/orders/${orderId}/complete`, { method: "POST" });
+      const payload = (await response.json()) as { ok?: boolean; message?: string };
+      if (!response.ok || !payload.ok) {
+        setStatusMessage(payload.message ?? "Unable to update order.");
+        return;
+      }
+
+      setStatusMessage(payload.message ?? "Order marked as completed.");
+      await fetchOrders();
+    } catch {
+      setStatusMessage("Unable to update order.");
+    } finally {
+      setUpdatingOrderId(null);
+    }
+  }
+
+  async function copyOrderId(orderId: string) {
+    try {
+      await navigator.clipboard.writeText(orderId);
+      setStatusMessage("Order ID copied to clipboard.");
+    } catch {
+      setStatusMessage("Could not copy order ID from this browser.");
+    }
+  }
 
   const visibleOrders = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -141,6 +172,16 @@ export function EnhancedOrderManager() {
                     <div className="text-xs">
                       <p className="mb-2 font-semibold text-foreground">Order Details</p>
                       <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            void copyOrderId(order.id);
+                          }}
+                          className="inline-flex items-center gap-1 rounded-md border border-border px-3 py-1 text-xs text-foreground transition hover:border-foreground"
+                        >
+                          Copy Order ID
+                        </button>
                         {order.invoiceUrl ? (
                           <Link
                             href={order.invoiceUrl}
@@ -149,6 +190,19 @@ export function EnhancedOrderManager() {
                           >
                             <FileText className="h-3 w-3" /> Download Invoice
                           </Link>
+                        ) : null}
+                        {order.status === "Pending" ? (
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              void markAsCompleted(order.id);
+                            }}
+                            disabled={updatingOrderId === order.id}
+                            className="inline-flex items-center gap-1 rounded-md border border-blue-200 bg-blue-50 px-3 py-1 text-xs text-blue-700 transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {updatingOrderId === order.id ? "Updating..." : "Mark as Completed"}
+                          </button>
                         ) : null}
                         <span className="rounded-md border border-border px-3 py-1 text-xs text-muted">
                           Items: {order.itemCount}
@@ -181,6 +235,10 @@ export function EnhancedOrderManager() {
           <p className="text-sm text-muted">No orders found matching your criteria</p>
         </div>
       )}
+
+      {statusMessage ? (
+        <p className="mt-4 rounded-md border border-border bg-surface px-3 py-2 text-sm text-muted">{statusMessage}</p>
+      ) : null}
     </section>
   );
 }

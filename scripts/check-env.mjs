@@ -33,10 +33,8 @@ const groups = [
   },
   {
     name: "Payments",
-    required: ["ABA_MERCHANT_ID"],
-    oneOf: [["ABA_API_KEY", "ABA_SECRET_KEY"]],
-    requiredExtra: ["BAKONG_MERCHANT_NAME"],
-    oneOfExtra: [["BAKONG_API_KEY", "BAKONG_MERCHANT_ID"]],
+    required: ["KHPAY_PROXY_SECRET", "KHPAY_WEBHOOK_SECRET", "PAYMENT_ADMIN_SECRET"],
+    oneOf: [["PAYWAY_LINK", "ABA_PAYWAY_LINK", "NEXT_PUBLIC_PAYWAY_LINK", "KHPAY_API_KEY"]],
   },
   {
     name: "Storage",

@@ -4,7 +4,6 @@ import { getServerSession } from "next-auth";
 import authOptions from "@/auth";
 import { db } from "@/lib/db";
 import { transactions } from "@/lib/db/schema";
-import { finalizeTransaction } from "@/lib/payments/finalize-transaction";
 
 export async function POST(request: NextRequest) {
   if (!db) {
@@ -54,16 +53,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true, message: "Payment already confirmed." });
     }
 
-    // Mark transaction as completed
-    await db
-      .update(transactions)
-      .set({ status: "completed", completedAt: new Date() })
-      .where(eq(transactions.id, transaction.id));
-
-    // Finalize the transaction (creates purchases and sends email)
-    await finalizeTransaction(transaction.id);
-
-    return NextResponse.json({ ok: true, message: "Payment confirmed successfully." });
+    // Security hardening: buyers cannot self-confirm payment completion.
+    // Completion must come from verified provider webhook or admin-confirm endpoint.
+    return NextResponse.json(
+      {
+        ok: false,
+        message: "Payment is still pending provider confirmation.",
+      },
+      { status: 409 },
+    );
   } catch (error) {
     console.error("[payments/confirm] Error:", error);
     return NextResponse.json({ ok: false, message: "Unable to confirm payment." }, { status: 500 });
